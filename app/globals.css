@@ -1,26 +1,363 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   RAW PALETTE  (Untitled UI ramp — do not invent colors outside this)
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Gray (foundation) */
+  --gray-25: #fcfcfd;
+  --gray-50: #f9fafb;
+  --gray-100: #f2f4f7;
+  --gray-200: #eaecf0;
+  --gray-300: #d0d5dd;
+  --gray-400: #98a2b3;
+  --gray-500: #667085;
+  --gray-600: #475467;
+  --gray-700: #344054;
+  --gray-800: #1d2939;
+  --gray-900: #101828;
+  --gray-950: #0c111d;
+
+  /* Brand / accent (violet) */
+  --brand-25: #fcfaff;
+  --brand-50: #f9f5ff;
+  --brand-100: #f4ebff;
+  --brand-200: #e9d7fe;
+  --brand-300: #d6bbfb;
+  --brand-400: #b692f6;
+  --brand-500: #9e77ed;
+  --brand-600: #7f56d9;
+  --brand-700: #6941c6;
+  --brand-800: #53389e;
+  --brand-900: #42307d;
+
+  /* Semantic */
+  --success-50: #ecfdf3;
+  --success-300: #75e0a7;
+  --success-400: #47cd89;
+  --success-500: #12b76a;
+  --success-600: #079455;
+  --success-700: #067647;
+
+  --warning-50: #fffaeb;
+  --warning-300: #fec84b;
+  --warning-400: #fdb022;
+  --warning-500: #f79009;
+  --warning-600: #dc6803;
+  --warning-700: #b54708;
+
+  --error-50: #fef3f2;
+  --error-100: #fee4e2;
+  --error-300: #fda29b;
+  --error-400: #f97066;
+  --error-500: #f04438;
+  --error-600: #d92d20;
+  --error-700: #b42318;
+
+  --info-50: #eff8ff;
+  --info-300: #84caff;
+  --info-400: #53b1fd;
+  --info-500: #2e90fa;
+  --info-600: #1570ef;
+  --info-700: #175cd3;
+
+  /* ----------------------------------------------------------
+     shadcn semantic ROLES (light — primary target)
+     ---------------------------------------------------------- */
+  --background: var(--gray-50);
+  --foreground: var(--gray-900);
+
+  --card: #ffffff;
+  --card-foreground: var(--gray-900);
+  --popover: #ffffff;
+  --popover-foreground: var(--gray-900);
+
+  --primary: var(--gray-950); /* NEAR-BLACK */
+  --primary-foreground: #ffffff;
+
+  --secondary: #ffffff;
+  --secondary-foreground: var(--gray-700);
+
+  --muted: var(--gray-100);
+  --muted-foreground: var(--gray-500);
+
+  --accent: var(--gray-100); /* neutral hover surface */
+  --accent-foreground: var(--gray-900);
+
+  /* brand accent — violet, used SPARINGLY (links, focus, logo, highlights) */
+  --brand: var(--brand-600);
+  --brand-foreground: #ffffff;
+
+  --destructive: var(--error-600);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--gray-200);
+  --input: var(--gray-300); /* input border is darker than card border */
+  --ring: var(--brand-300); /* 4px focus ring */
+
+  /* secondary text / placeholders */
+  --text-secondary: var(--gray-600);
+  --text-tertiary: var(--gray-500);
+
+  /* sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: var(--gray-700);
+  --sidebar-border: var(--gray-200);
+  --sidebar-accent: var(--gray-100); /* active / hover */
+  --sidebar-accent-foreground: var(--gray-900);
+  --sidebar-ring: var(--brand-300);
+
+  /* radii */
+  --radius: 0.5rem; /* 8px — buttons / inputs */
+
+  /* shadows (Untitled UI) */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.1), 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ============================================================
+   DARK THEME (parallel — light is the primary target)
+   ============================================================ */
+.dark {
+  /* Surfaces: elevation by LIGHTNESS (canvas darkest → popover lightest). */
+  --background: var(--gray-950); /* #0C111D canvas */
+  --foreground: var(--gray-50); /* #F9FAFB — never pure white */
+
+  --card: var(--gray-900); /* #101828 surface-1 */
+  --card-foreground: var(--gray-50);
+  --popover: var(--gray-800); /* #1D2939 surface-2 (modals/dropdowns) */
+  --popover-foreground: var(--gray-50);
+
+  /* Primary INVERTS to keep the neutral high-contrast identity. */
+  --primary: var(--gray-50); /* near-white */
+  --primary-foreground: var(--gray-950); /* dark text */
+
+  /* Secondary button: transparent over surface + default border + light text. */
+  --secondary: transparent;
+  --secondary-foreground: var(--gray-100);
+
+  --muted: var(--gray-800);
+  --muted-foreground: var(--gray-400); /* #98A2B3 — still body-readable */
+
+  /* Hover/active layer = white overlay (lighten, don't darken). */
+  --accent: rgba(255, 255, 255, 0.06);
+  --accent-foreground: var(--gray-50);
+
+  /* Accent uses a LIGHTER tint on dark; filled accent carries dark text. */
+  --brand: var(--brand-400); /* #B692F6 */
+  --brand-foreground: var(--gray-950);
+
+  --destructive: var(--error-500);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--gray-800); /* subtle (dividers, card edges) */
+  /* Interactive edges (inputs/selects/secondary buttons) must read as structure
+     ≥3:1 against the near-black canvas, so they're lighter than dividers. */
+  --input: var(--gray-500);
+  --ring: var(--brand-400); /* visible focus on dark */
+
+  --text-secondary: var(--gray-300); /* #D0D5DD */
+  --text-tertiary: var(--gray-400); /* #98A2B3 */
+
+  --sidebar: var(--gray-900);
+  --sidebar-foreground: var(--gray-300);
+  --sidebar-border: var(--gray-800);
+  --sidebar-accent: rgba(255, 255, 255, 0.08); /* active nav overlay */
+  --sidebar-accent-foreground: var(--gray-50);
+  --sidebar-ring: var(--brand-400);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ============================================================
+   SCROLLBARS — themed (subtle on dark)
+   ============================================================ */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-300) transparent;
+  }
+  .dark * {
+    scrollbar-color: var(--gray-700) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--gray-300);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .dark *::-webkit-scrollbar-thumb {
+    background-color: var(--gray-700);
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================================
+   THEME MAPPING → Tailwind v4 utility namespaces
+   ============================================================ */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* role colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* full palette as utilities (bg-gray-50, text-brand-600, etc.) */
+  --color-gray-25: var(--gray-25);
+  --color-gray-50: var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
+  --color-gray-300: var(--gray-300);
+  --color-gray-400: var(--gray-400);
+  --color-gray-500: var(--gray-500);
+  --color-gray-600: var(--gray-600);
+  --color-gray-700: var(--gray-700);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
+  --color-gray-950: var(--gray-950);
+
+  --color-brand-25: var(--brand-25);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-success-50: var(--success-50);
+  --color-success-300: var(--success-300);
+  --color-success-400: var(--success-400);
+  --color-success-500: var(--success-500);
+  --color-success-600: var(--success-600);
+  --color-success-700: var(--success-700);
+  --color-warning-50: var(--warning-50);
+  --color-warning-300: var(--warning-300);
+  --color-warning-400: var(--warning-400);
+  --color-warning-500: var(--warning-500);
+  --color-warning-600: var(--warning-600);
+  --color-warning-700: var(--warning-700);
+  --color-error-50: var(--error-50);
+  --color-error-100: var(--error-100);
+  --color-error-300: var(--error-300);
+  --color-error-400: var(--error-400);
+  --color-error-500: var(--error-500);
+  --color-error-600: var(--error-600);
+  --color-error-700: var(--error-700);
+  --color-info-50: var(--info-50);
+  --color-info-300: var(--info-300);
+  --color-info-400: var(--info-400);
+  --color-info-500: var(--info-500);
+  --color-info-600: var(--info-600);
+  --color-info-700: var(--info-700);
+
+  /* radii — base 8px, cards 12px (xl) */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px); /* 12px cards */
+
+  /* shadows */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 14px; /* base 14px */
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* -0.02em tracking on display / title sizes */
+  h1,
+  h2,
+  h3,
+  .text-display-sm,
+  .text-display-md {
+    letter-spacing: -0.02em;
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+}
+
+/* ============================================================
+   TYPE SCALE HELPERS (Inter)
+   ============================================================ */
+@layer utilities {
+  .text-display-sm {
+    font-size: 30px;
+    line-height: 38px;
+    font-weight: 600;
+  }
+  .text-display-md {
+    font-size: 36px;
+    line-height: 44px;
+    font-weight: 600;
+  }
+  .text-title-xl {
+    font-size: 20px;
+    line-height: 30px;
+    font-weight: 600;
+  }
+  .text-title-lg {
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 600;
+  }
 }
