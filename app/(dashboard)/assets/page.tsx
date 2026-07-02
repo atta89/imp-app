@@ -10,6 +10,7 @@ import {
   Boxes,
   SearchX,
   ArrowRightLeft,
+  ClipboardCheck,
   Printer,
   X,
   PlaneTakeoff,
@@ -43,9 +44,10 @@ import {
   BulkTransferDialog,
   BulkChangeStatusDialog,
   BulkPrintLabelsDialog,
+  BulkUpdateConditionDialog,
 } from "@/components/assets/bulk-action-dialogs";
 
-type BulkDialog = "transfer" | "status" | "print" | null;
+type BulkDialog = "transfer" | "status" | "condition" | "print" | null;
 
 // Stable empty array so the RBAC memo doesn't recompute every render.
 const NO_VENUES: string[] = [];
@@ -330,6 +332,14 @@ export default function AssetsPage() {
                 <Button
                   variant="secondary"
                   size="sm"
+                  onClick={() => setBulkDialog("condition")}
+                >
+                  <ClipboardCheck className="size-4" />
+                  Update condition
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setBulkDialog("print")}
                 >
                   <Printer className="size-4" />
@@ -541,6 +551,13 @@ export default function AssetsPage() {
       />
       <BulkChangeStatusDialog
         open={bulkDialog === "status"}
+        onOpenChange={(o) => !o && setBulkDialog(null)}
+        assetIds={selectedIds}
+        resolveTag={resolveTag}
+        onDone={() => setSelectedIds([])}
+      />
+      <BulkUpdateConditionDialog
+        open={bulkDialog === "condition"}
         onOpenChange={(o) => !o && setBulkDialog(null)}
         assetIds={selectedIds}
         resolveTag={resolveTag}

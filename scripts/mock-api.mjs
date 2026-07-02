@@ -586,6 +586,32 @@ const server = createServer(async (req, res) => {
     return send(res, 200, { data: asset });
   }
 
+  if (path === "/assets/condition/bulk" && req.method === "POST") {
+    if (!Array.isArray(body.assetIds) || !body.assetIds.length)
+      return send(res, 400, { error: { kind: "validation", fields: { assetIds: "Select at least one asset." } } });
+    if (!["new", "good", "fair", "poor"].includes(body.condition))
+      return send(res, 400, { error: { kind: "validation", fields: { condition: "Invalid condition." } } });
+    let updated = 0;
+    const skipped = [];
+    for (const id of body.assetIds) {
+      const asset = findAsset(id);
+      if (!asset) { skipped.push({ id, reason: "not_found" }); continue; }
+      if (asset.status === "retired" || asset.status === "lost") {
+        skipped.push({ id, reason: "forbidden" });
+        continue;
+      }
+      if (asset.condition === body.condition) {
+        skipped.push({ id, reason: "unchanged" });
+        continue;
+      }
+      pushHistory(asset.id, { type: "condition_change", fromCondition: asset.condition, toCondition: body.condition, notes: body.notes });
+      asset.condition = body.condition;
+      asset.updatedAt = iso(Date.now());
+      updated += 1;
+    }
+    return send(res, 200, { data: { updated, skipped } });
+  }
+
   const condition = path.match(/^\/assets\/([^/]+)\/condition$/);
   if (condition && req.method === "POST") {
     const asset = findAsset(condition[1]);

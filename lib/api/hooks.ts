@@ -445,6 +445,25 @@ export function useBulkChangeStatus() {
   });
 }
 
+export function useBulkUpdateCondition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      body: components["schemas"]["BulkConditionUpdate"],
+    ) => {
+      const env = unwrap(
+        await api.POST("/assets/condition/bulk", { body }),
+      );
+      if (!env.data) throw toApiError(undefined, 500);
+      return env.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.assets.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+    },
+  });
+}
+
 /** Combined PDF of QR labels for the batch. Returns the blob; caller downloads it. */
 export function useBulkQrPdf() {
   return useMutation({

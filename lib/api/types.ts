@@ -27,6 +27,9 @@ export type BulkStatusRequest = components["schemas"]["BulkStatusRequest"];
 export type BulkQrRequest = components["schemas"]["BulkQrRequest"];
 export type BulkActionResult = components["schemas"]["BulkActionResult"];
 export type BulkActionResponse = components["schemas"]["BulkActionResponse"];
+export type BulkConditionUpdate = components["schemas"]["BulkConditionUpdate"];
+export type BulkConditionResult = components["schemas"]["BulkConditionResult"];
+export type BulkConditionSkipped = components["schemas"]["BulkConditionSkipped"];
 export type ReceivePurchaseOrderRequest =
   components["schemas"]["ReceivePurchaseOrderRequest"];
 export type CreateRepairRequest = components["schemas"]["CreateRepairRequest"];
