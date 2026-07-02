@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/assets/status-badge";
+import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ResponsibleCell } from "@/components/assets/responsible-cell";
 import { formatRelative } from "@/lib/format";
 import type { AssetRow } from "@/lib/assets/view";
@@ -44,12 +45,15 @@ export function AssetCard({
               </p>
             </Link>
           </div>
-          <StatusBadge
-            status={asset.status}
-            away={asset.away}
-            venueName={asset.away ? asset.currentVenueName : undefined}
-            overdue={asset.isOverdue}
-          />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StatusBadge
+              status={asset.status}
+              away={asset.away}
+              venueName={asset.away ? asset.currentVenueName : undefined}
+              overdue={asset.isOverdue}
+            />
+            <ConditionBadge condition={asset.condition} />
+          </div>
           <div className="flex items-center gap-1.5 text-xs text-text-secondary">
             <MapPin className="size-3.5 text-text-tertiary" />
             <span className="truncate">

@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/assets/status-badge";
+import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ResponsibleCell } from "@/components/assets/responsible-cell";
 import { AssetCard } from "@/components/assets/asset-card";
 import { formatRelative, formatDate } from "@/lib/format";
@@ -200,6 +201,13 @@ export default function AssetsPage() {
           overdue={a.isOverdue}
         />
       ),
+    },
+    {
+      id: "condition",
+      header: "Condition",
+      className: "w-[120px]",
+      skeletonClassName: "w-16",
+      cell: (a) => <ConditionBadge condition={a.condition} />,
     },
     {
       id: "home",

@@ -24,7 +24,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -33,6 +32,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/assets/status-badge";
+import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ResponsibleCell } from "@/components/assets/responsible-cell";
 import { HistoryTimeline } from "@/components/assets/history-timeline";
 import { QrLabel } from "@/components/assets/qr-label";
@@ -41,6 +41,7 @@ import {
   TransferDialog,
   AssignDialog,
   SendToRepairDialog,
+  UpdateConditionDialog,
 } from "@/components/assets/action-dialogs";
 import { assetActions, type AssetAction } from "@/lib/assets/transitions";
 import { buildLookups, toAssetRow } from "@/lib/assets/view";
@@ -52,6 +53,7 @@ import {
   useCategories,
   useUsers,
 } from "@/lib/api/hooks";
+import { useAuth } from "@/lib/auth/auth-context";
 import { formatDate } from "@/lib/format";
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -65,17 +67,11 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  good: "Good",
-  fair: "Fair",
-  poor: "Poor",
-};
-
 export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
+  const { user } = useAuth();
   const assetQuery = useAsset(id);
   const historyQuery = useAssetHistory(id);
   const venuesQuery = useVenues();
@@ -160,7 +156,17 @@ export default function AssetDetailPage() {
   const row = toAssetRow(asset, lookups);
   const category = lookups.categories.get(asset.categoryId);
   const customFields = category?.customFields ?? [];
-  const actions = assetActions(asset.status);
+
+  // Role/venue scope: admins see everything; others need the asset's home or
+  // current venue in their scope. The backend is the real enforcer — this
+  // just hides actions we know will be rejected.
+  const inScope =
+    user?.role === "admin" ||
+    Boolean(
+      user?.venueIds?.includes(asset.homeVenueId) ||
+        user?.venueIds?.includes(asset.currentVenueId),
+    );
+  const actions = assetActions(asset.status).filter(() => inScope);
   const headerActions = actions.filter((a) => !a.overflow);
   const overflowActions = actions.filter((a) => a.overflow);
 
@@ -228,12 +234,15 @@ export default function AssetDetailPage() {
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <CardTitle>Details</CardTitle>
-                  <StatusBadge
-                    status={asset.status}
-                    away={row.away}
-                    venueName={row.away ? row.currentVenueName : undefined}
-                    overdue={asset.isOverdue}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge
+                      status={asset.status}
+                      away={row.away}
+                      venueName={row.away ? row.currentVenueName : undefined}
+                      overdue={asset.isOverdue}
+                    />
+                    <ConditionBadge condition={asset.condition} />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -251,11 +260,7 @@ export default function AssetDetailPage() {
                   />
                   <DetailRow
                     label="Condition"
-                    value={
-                      <Badge color="gray">
-                        {CONDITION_LABEL[asset.condition] ?? asset.condition}
-                      </Badge>
-                    }
+                    value={<ConditionBadge condition={asset.condition} />}
                   />
                   <DetailRow
                     label="Responsible"
@@ -409,6 +414,12 @@ export default function AssetDetailPage() {
         assetId={id}
         open={active?.type === "repair"}
         onOpenChange={(o) => !o && setActive(null)}
+      />
+      <UpdateConditionDialog
+        assetId={id}
+        open={active?.type === "condition"}
+        onOpenChange={(o) => !o && setActive(null)}
+        currentCondition={asset.condition}
       />
     </PageContainer>
   );

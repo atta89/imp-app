@@ -9,11 +9,17 @@ import {
   UserPlus,
   CircleSlash,
   Search,
+  ClipboardCheck,
 } from "lucide-react";
 
 import type { AssetStatus } from "@/lib/api/types";
 
-export type AssetActionType = "status" | "transfer" | "assign" | "repair";
+export type AssetActionType =
+  | "status"
+  | "transfer"
+  | "assign"
+  | "repair"
+  | "condition";
 
 export interface AssetAction {
   id: string;
@@ -48,6 +54,13 @@ const sendToRepair: AssetAction = {
   type: "repair",
   overflow: true,
 };
+const updateCondition: AssetAction = {
+  id: "condition",
+  label: "Update condition",
+  icon: ClipboardCheck,
+  type: "condition",
+  overflow: true,
+};
 const retire: AssetAction = {
   id: "retire",
   label: "Retire",
@@ -74,6 +87,7 @@ export function assetActions(status: AssetStatus): AssetAction[] {
         { id: "deploy", label: "Mark in use", icon: PlugZap, type: "status", targetStatus: "in_use", tone: "primary" },
         transfer,
         assign,
+        updateCondition,
         sendToRepair,
         retire,
         markLost,
@@ -83,6 +97,7 @@ export function assetActions(status: AssetStatus): AssetAction[] {
         { id: "return", label: "Mark available", icon: Undo2, type: "status", targetStatus: "available", tone: "primary" },
         transfer,
         assign,
+        updateCondition,
         sendToRepair,
         retire,
         markLost,
@@ -92,6 +107,7 @@ export function assetActions(status: AssetStatus): AssetAction[] {
         { id: "repaired", label: "Mark repaired", icon: CircleCheck, type: "status", targetStatus: "available", tone: "primary" },
         { id: "unrepairable", label: "Mark unrepairable", icon: Ban, type: "status", targetStatus: "retired", tone: "destructive", overflow: true },
         assign,
+        updateCondition,
         markLost,
       ];
     case "lost":

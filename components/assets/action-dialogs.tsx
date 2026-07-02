@@ -12,8 +12,15 @@ import {
   useChangeAssetStatus,
   useCreateRepair,
   useTransferAsset,
+  useUpdateAssetCondition,
 } from "@/lib/api/hooks";
-import type { AssetStatus, User, Venue } from "@/lib/api/types";
+import type {
+  AssetCondition,
+  AssetStatus,
+  User,
+  Venue,
+} from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -320,6 +327,175 @@ export function AssignDialog({
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? "Assigning…" : "Assign"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Update condition ────────────────────────────────────────────────────────
+
+const CONDITIONS: {
+  value: AssetCondition;
+  label: string;
+  /** Segment color when selected. */
+  selectedClass: string;
+}[] = [
+  {
+    value: "new",
+    label: "New",
+    selectedClass:
+      "bg-info-50 text-info-700 border-info-200 dark:bg-info-400/15 dark:text-info-300 dark:border-info-400/40",
+  },
+  {
+    value: "good",
+    label: "Good",
+    selectedClass:
+      "bg-success-50 text-success-700 border-success-200 dark:bg-success-400/15 dark:text-success-300 dark:border-success-400/40",
+  },
+  {
+    value: "fair",
+    label: "Fair",
+    selectedClass:
+      "bg-warning-50 text-warning-700 border-warning-200 dark:bg-warning-400/15 dark:text-warning-300 dark:border-warning-400/40",
+  },
+  {
+    value: "poor",
+    label: "Poor",
+    selectedClass:
+      "bg-error-50 text-error-700 border-error-200 dark:bg-error-400/15 dark:text-error-300 dark:border-error-400/40",
+  },
+];
+
+const conditionSchema = z.object({
+  condition: z.enum(["new", "good", "fair", "poor"]),
+  notes: z.string().optional(),
+});
+type ConditionValues = z.infer<typeof conditionSchema>;
+
+export function UpdateConditionDialog({
+  assetId,
+  open,
+  onOpenChange,
+  currentCondition,
+}: {
+  assetId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentCondition: AssetCondition;
+}) {
+  const mutation = useUpdateAssetCondition(assetId);
+  const {
+    handleSubmit,
+    register,
+    reset,
+    setError,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<ConditionValues>({
+    resolver: zodResolver(conditionSchema),
+    defaultValues: { condition: currentCondition, notes: "" },
+  });
+  // Reset with the latest current condition each time the dialog opens.
+  React.useEffect(() => {
+    if (open) reset({ condition: currentCondition, notes: "" });
+  }, [open, currentCondition, reset]);
+
+  const selected = watch("condition");
+  const unchanged = selected === currentCondition;
+
+  async function onSubmit(values: ConditionValues) {
+    try {
+      await mutation.mutateAsync({
+        condition: values.condition,
+        notes: values.notes || undefined,
+      });
+      toast.success("Condition updated.");
+      onOpenChange(false);
+    } catch (e) {
+      applyError(e, setError as never, ["condition", "notes"]);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <DialogHeader>
+            <DialogTitle>Update condition</DialogTitle>
+            <DialogDescription>
+              Record the asset’s current physical condition. The change is
+              logged in history.
+            </DialogDescription>
+          </DialogHeader>
+          <FormRow
+            label="Condition"
+            required
+            error={errors.condition?.message}
+          >
+            <div
+              role="radiogroup"
+              aria-label="Condition"
+              className="inline-flex w-full items-stretch rounded-lg border border-input bg-card p-1"
+            >
+              {CONDITIONS.map((c) => {
+                const active = selected === c.value;
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() =>
+                      setValue("condition", c.value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    className={cn(
+                      "flex-1 rounded-md border border-transparent px-3 py-1.5 text-sm font-medium transition-colors outline-none",
+                      "focus-visible:ring-4 focus-visible:ring-brand-100 focus-visible:border-brand-300",
+                      "dark:focus-visible:ring-brand-400/30 dark:focus-visible:border-brand-400",
+                      active
+                        ? c.selectedClass
+                        : "text-text-secondary hover:bg-gray-50 dark:hover:bg-white/6",
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          </FormRow>
+          <FormRow
+            label="Notes"
+            htmlFor="condition-notes"
+            helper={
+              unchanged
+                ? "Same as current — pick a different condition to save."
+                : "What did you observe? (optional)"
+            }
+          >
+            <Textarea
+              id="condition-notes"
+              placeholder="e.g. scratched casing after last event"
+              {...register("notes")}
+            />
+          </FormRow>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || unchanged}
+            >
+              {mutation.isPending ? "Saving…" : "Save condition"}
             </Button>
           </DialogFooter>
         </form>

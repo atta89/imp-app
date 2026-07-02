@@ -12,6 +12,7 @@ import { queryKeys, type AssetFilters } from "@/lib/api/query-keys";
 import type { components } from "@/lib/api/schema";
 import type {
   AssignCustodyRequest,
+  ConditionUpdate,
   StatusChangeRequest,
   TransferAssetRequest,
 } from "@/lib/api/types";
@@ -164,6 +165,20 @@ export function useAssignCustody(id: string) {
     mutationFn: async (body: AssignCustodyRequest) =>
       unwrap(
         await api.POST("/assets/{id}/assign", { params: { path: { id } }, body }),
+      ).data,
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateAssetCondition(id: string) {
+  const invalidate = useAssetMutationInvalidation(id);
+  return useMutation({
+    mutationFn: async (body: ConditionUpdate) =>
+      unwrap(
+        await api.POST("/assets/{id}/condition", {
+          params: { path: { id } },
+          body,
+        }),
       ).data,
     onSuccess: invalidate,
   });

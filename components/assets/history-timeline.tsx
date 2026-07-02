@@ -4,11 +4,13 @@ import {
   UserRound,
   Wrench,
   CircleCheck,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatDate, formatRelative } from "@/lib/format";
+import { CONDITION_LABEL } from "@/components/assets/condition-badge";
 import type { Movement, MovementType } from "@/lib/api/types";
 import type { AssetLookups } from "@/lib/assets/view";
 
@@ -24,6 +26,7 @@ const ICONS: Record<MovementType, LucideIcon> = {
   transfer: ArrowRightLeft,
   status_change: RefreshCw,
   custody_change: UserRound,
+  condition_change: ClipboardCheck,
   repair_in: Wrench,
   repair_out: CircleCheck,
 };
@@ -34,6 +37,8 @@ function describe(m: Movement, lookups: AssetLookups): string {
   const user = (id?: string) =>
     (id && lookups.users.get(id)?.name) || "someone";
   const status = (s?: string) => (s ? (STATUS_LABEL[s] ?? s) : "—");
+  const condition = (c?: string) =>
+    c ? (CONDITION_LABEL[c as keyof typeof CONDITION_LABEL] ?? c) : "—";
 
   switch (m.type) {
     case "transfer":
@@ -42,6 +47,8 @@ function describe(m: Movement, lookups: AssetLookups): string {
       return `Status changed from ${status(m.fromStatus)} to ${status(m.toStatus)}`;
     case "custody_change":
       return `Custody reassigned to ${user(m.toUserId)}`;
+    case "condition_change":
+      return `Condition changed: ${condition(m.fromCondition)} → ${condition(m.toCondition)}`;
     case "repair_in":
       return "Sent to repair";
     case "repair_out":

@@ -586,6 +586,20 @@ const server = createServer(async (req, res) => {
     return send(res, 200, { data: asset });
   }
 
+  const condition = path.match(/^\/assets\/([^/]+)\/condition$/);
+  if (condition && req.method === "POST") {
+    const asset = findAsset(condition[1]);
+    if (!asset) return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
+    if (!["new", "good", "fair", "poor"].includes(body.condition))
+      return send(res, 400, { error: { kind: "validation", fields: { condition: "Invalid condition." } } });
+    if (body.condition !== asset.condition) {
+      pushHistory(asset.id, { type: "condition_change", fromCondition: asset.condition, toCondition: body.condition, notes: body.notes });
+      asset.condition = body.condition;
+      asset.updatedAt = iso(Date.now());
+    }
+    return send(res, 200, { data: asset });
+  }
+
   const one = path.match(/^\/assets\/([^/]+)$/);
   if (one) {
     const asset = findAsset(one[1]);
