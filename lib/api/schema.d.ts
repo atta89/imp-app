@@ -927,6 +927,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assets/{id}/condition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["IdPath"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConditionUpdate"];
+                };
+            };
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["Asset"];
+                        };
+                    };
+                };
+                409: components["responses"]["ErrorResponse"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assets/{id}/qr": {
         parameters: {
             query?: never;
@@ -1080,6 +1126,49 @@ export interface paths {
                     content: {
                         "application/json": {
                             data?: components["schemas"]["BulkActionResponse"];
+                        };
+                    };
+                };
+                400: components["responses"]["ErrorResponse"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/condition/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set condition on many assets at once. BEST-EFFORT: each successful item is its own transaction; unaffected items are reported in skipped[] with a reason (not_found, forbidden, unchanged). */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BulkConditionUpdate"];
+                };
+            };
+            responses: {
+                /** @description bulk summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["BulkConditionResult"];
                         };
                     };
                 };
@@ -2066,7 +2155,7 @@ export interface components {
         /** @enum {string} */
         AssetCondition: "new" | "good" | "fair" | "poor";
         /** @enum {string} */
-        MovementType: "transfer" | "status_change" | "custody_change" | "repair_in" | "repair_out";
+        MovementType: "transfer" | "status_change" | "custody_change" | "condition_change" | "repair_in" | "repair_out";
         /** @enum {string} */
         RepairStatus: "open" | "in_progress" | "completed" | "unrepairable";
         /** @enum {string} */
@@ -2210,6 +2299,8 @@ export interface components {
             toVenueId?: components["schemas"]["ObjectId"];
             fromStatus?: components["schemas"]["AssetStatus"];
             toStatus?: components["schemas"]["AssetStatus"];
+            fromCondition?: components["schemas"]["AssetCondition"];
+            toCondition?: components["schemas"]["AssetCondition"];
             fromUserId?: components["schemas"]["ObjectId"];
             toUserId?: components["schemas"]["ObjectId"];
             reason?: string;
@@ -2408,6 +2499,10 @@ export interface components {
             status: components["schemas"]["AssetStatus"];
             reason?: string;
         };
+        ConditionUpdate: {
+            condition: components["schemas"]["AssetCondition"];
+            notes?: string;
+        };
         AssignCustodyRequest: {
             responsibleUserId: components["schemas"]["ObjectId"];
             notes?: string;
@@ -2441,6 +2536,20 @@ export interface components {
             succeeded: number;
             failed: number;
             results: components["schemas"]["BulkActionResult"][];
+        };
+        BulkConditionUpdate: {
+            assetIds: components["schemas"]["ObjectId"][];
+            condition: components["schemas"]["AssetCondition"];
+            notes?: string;
+        };
+        BulkConditionSkipped: {
+            id: components["schemas"]["ObjectId"];
+            /** @description One of: not_found, forbidden, unchanged. */
+            reason: string;
+        };
+        BulkConditionResult: {
+            updated: number;
+            skipped: components["schemas"]["BulkConditionSkipped"][];
         };
         CreatePurchaseOrderRequest: {
             poNumber: string;
