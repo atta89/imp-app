@@ -43,7 +43,6 @@ import {
   SendToRepairDialog,
   UpdateConditionDialog,
 } from "@/components/assets/action-dialogs";
-import { ChangeHomeDialog } from "@/components/assets/change-home-dialog";
 import { assetActions, type AssetAction } from "@/lib/assets/transitions";
 import { buildLookups, toAssetRow } from "@/lib/assets/view";
 import { ApiError } from "@/lib/api/errors";
@@ -442,14 +441,6 @@ export default function AssetDetailPage() {
         open={active?.type === "condition"}
         onOpenChange={(o) => !o && setActive(null)}
         currentCondition={asset.condition}
-      />
-      <ChangeHomeDialog
-        assetId={id}
-        open={active?.type === "home"}
-        onOpenChange={(o) => !o && setActive(null)}
-        venues={venuesQuery.data ?? []}
-        currentHomeVenueId={asset.homeVenueId}
-        currentDepartmentId={asset.departmentId}
       />
     </PageContainer>
   );

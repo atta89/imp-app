@@ -134,22 +134,6 @@ function useAssetMutationInvalidation(id: string) {
   };
 }
 
-/**
- * Generic asset PUT — used for edits that don't have a dedicated verb (e.g.
- * changing the home venue / home department). The backend enforces the
- * "department belongs to home venue" invariant; surface any 400 via
- * `applyFormError`.
- */
-export function useUpdateAsset(id: string) {
-  const invalidate = useAssetMutationInvalidation(id);
-  return useMutation({
-    mutationFn: async (body: components["schemas"]["UpdateAssetRequest"]) =>
-      unwrap(await api.PUT("/assets/{id}", { params: { path: { id } }, body }))
-        .data,
-    onSuccess: invalidate,
-  });
-}
-
 export function useTransferAsset(id: string) {
   const invalidate = useAssetMutationInvalidation(id);
   return useMutation({
