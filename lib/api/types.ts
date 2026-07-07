@@ -31,6 +31,8 @@ export type CreatePurchaseOrderRequest =
 // Bulk asset actions
 export type BulkTransferRequest = components["schemas"]["BulkTransferRequest"];
 export type BulkStatusRequest = components["schemas"]["BulkStatusRequest"];
+export type BulkAssignRequest = components["schemas"]["BulkAssignRequest"];
+export type BulkAssignResponse = components["schemas"]["BulkAssignResponse"];
 export type BulkQrRequest = components["schemas"]["BulkQrRequest"];
 export type BulkActionResult = components["schemas"]["BulkActionResult"];
 export type BulkActionResponse = components["schemas"]["BulkActionResponse"];

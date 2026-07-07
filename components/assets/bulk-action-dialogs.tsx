@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 
 import {
+  useBulkAssign,
   useBulkTransfer,
   useBulkChangeStatus,
   useBulkQrPdf,
@@ -19,7 +20,9 @@ import type {
   AssetStatus,
   BulkActionResponse,
   BulkActionResult,
+  BulkAssignResponse,
   BulkConditionResult,
+  User,
   Venue,
 } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -78,10 +81,14 @@ export type ResolveTag = (assetId: string) => string;
 function BulkFailureReport({
   result,
   resolveTag,
+  errorLabelFor,
 }: {
   result: BulkActionResponse;
   resolveTag: ResolveTag;
+  /** Optional per-code label override; falls back to the shared ERROR_LABEL map. */
+  errorLabelFor?: (code: string | undefined) => string;
 }) {
+  const labelOf = errorLabelFor ?? errorLabel;
   const failures = result.results.filter((r) => !r.ok);
 
   // Batch-wide synthetic row → one top-line message, not a per-row group.
@@ -92,7 +99,7 @@ function BulkFailureReport({
     return (
       <div className="flex items-start gap-2.5 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-700 dark:border-error-400/20 dark:bg-error-400/10 dark:text-error-300">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-        <span>{errorLabel(failures[0].error)}</span>
+        <span>{labelOf(failures[0].error)}</span>
       </div>
     );
   }
@@ -128,7 +135,7 @@ function BulkFailureReport({
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-foreground">
-                {errorLabel(code)}
+                {labelOf(code)}
               </span>
               <Badge color="gray">{rows.length}</Badge>
             </div>
@@ -282,6 +289,205 @@ export function BulkTransferDialog({
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? "Transferring…" : "Transfer"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Bulk reassign custody ─────────────────────────────────────────────────────
+
+// Per-row error copy the assign endpoint returns; overrides the shared map
+// with the wording the spec asked for on this surface.
+const ASSIGN_ERROR_LABEL: Record<string, string> = {
+  not_found: "Asset no longer exists",
+  forbidden: "You don’t have access to this asset",
+  duplicate_id: "Duplicate asset in selection",
+};
+const assignErrorLabel = (code: string | undefined) =>
+  (code && ASSIGN_ERROR_LABEL[code]) || errorLabel(code);
+
+const BULK_ASSIGN_CAP = 500;
+
+const assignSchema = z.object({
+  responsibleUserId: z.string().min(1, "Choose a responsible person"),
+  notes: z.string().optional(),
+});
+type AssignValues = z.infer<typeof assignSchema>;
+
+/** Adapts a BulkAssignResponse to the shape BulkFailureReport expects. */
+function toFailureShape(res: BulkAssignResponse): BulkActionResponse {
+  const failed = res.results.filter((r) => !r.ok).length;
+  return {
+    total: res.total,
+    succeeded: res.updated,
+    failed,
+    results: res.results,
+  };
+}
+
+export function BulkAssignDialog({
+  open,
+  onOpenChange,
+  assetIds,
+  users,
+  resolveTag,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  assetIds: string[];
+  users: User[];
+  resolveTag: ResolveTag;
+  onDone: () => void;
+}) {
+  const mutation = useBulkAssign();
+  const [result, setResult] = React.useState<BulkAssignResponse | null>(null);
+  // Server-message banner for global 400s (unknown/inactive user, empty, over-cap).
+  const [globalError, setGlobalError] = React.useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<AssignValues>({
+    resolver: zodResolver(assignSchema),
+    defaultValues: { responsibleUserId: "", notes: "" },
+  });
+
+  useResetOnOpen(open, () => {
+    reset({ responsibleUserId: "", notes: "" });
+    setResult(null);
+    setGlobalError(null);
+  });
+
+  async function onSubmit(values: AssignValues) {
+    setGlobalError(null);
+    // Client-side guards — fail fast before the network call.
+    if (assetIds.length === 0) {
+      setError("responsibleUserId", { message: "No assets selected." });
+      return;
+    }
+    if (assetIds.length > BULK_ASSIGN_CAP) {
+      setGlobalError(
+        `Too many assets — reassign at most ${BULK_ASSIGN_CAP} at a time.`,
+      );
+      return;
+    }
+    try {
+      const res = await mutation.mutateAsync({
+        assetIds,
+        responsibleUserId: values.responsibleUserId,
+        notes: values.notes || undefined,
+      });
+      const hasFailure = res.results.some((r) => !r.ok);
+      if (!hasFailure) {
+        const parts = [
+          `${res.updated} reassigned`,
+          res.skippedNoOp > 0
+            ? `${res.skippedNoOp} already assigned (skipped)`
+            : null,
+        ].filter(Boolean);
+        toast.success(parts.join(", ") + ".", {
+          description:
+            "One digest email is on its way to the new custodian.",
+        });
+        onDone();
+        onOpenChange(false);
+      } else {
+        setResult(res);
+      }
+    } catch (e) {
+      const msg = errorMessage(e);
+      setGlobalError(msg);
+      toast.error(msg);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {result ? (
+          <div className="space-y-5">
+            <DialogHeader>
+              <DialogTitle>Reassignment results</DialogTitle>
+            </DialogHeader>
+            <BulkFailureReport
+              result={toFailureShape(result)}
+              resolveTag={resolveTag}
+              errorLabelFor={assignErrorLabel}
+            />
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setResult(null)}>
+                Back
+              </Button>
+              <Button
+                onClick={() => {
+                  onDone();
+                  onOpenChange(false);
+                }}
+              >
+                Clear selection &amp; close
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <DialogHeader>
+              <DialogTitle>
+                Reassign custody — {assetIds.length} asset
+                {assetIds.length === 1 ? "" : "s"}
+              </DialogTitle>
+              <DialogDescription>
+                Change who is accountable for every selected asset. One digest
+                email is sent to the new custodian summarizing everything they
+                just picked up.
+              </DialogDescription>
+            </DialogHeader>
+            {globalError ? (
+              <div className="flex items-start gap-2.5 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-700 dark:border-error-400/20 dark:bg-error-400/10 dark:text-error-300">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <span>{globalError}</span>
+              </div>
+            ) : null}
+            <FormRow
+              label="Responsible person"
+              htmlFor="bulk-responsible"
+              required
+              error={errors.responsibleUserId?.message}
+            >
+              <Select
+                id="bulk-responsible"
+                className="w-full"
+                {...register("responsibleUserId")}
+              >
+                <option value="">Select a person…</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} — {u.position}
+                  </option>
+                ))}
+              </Select>
+            </FormRow>
+            <FormRow label="Notes" htmlFor="bulk-assign-notes">
+              <Textarea
+                id="bulk-assign-notes"
+                placeholder="Optional"
+                {...register("notes")}
+              />
+            </FormRow>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? "Reassigning…" : "Reassign"}
               </Button>
             </DialogFooter>
           </form>

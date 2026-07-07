@@ -466,6 +466,21 @@ export function useBulkChangeStatus() {
   });
 }
 
+export function useBulkAssign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: components["schemas"]["BulkAssignRequest"]) => {
+      const env = unwrap(await api.POST("/assets/bulk/assign", { body }));
+      if (!env.data) throw toApiError(undefined, 500);
+      return env.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.assets.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+    },
+  });
+}
+
 export function useBulkUpdateCondition() {
   const qc = useQueryClient();
   return useMutation({

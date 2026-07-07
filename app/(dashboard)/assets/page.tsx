@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   RotateCw,
   RefreshCw,
+  UserCog,
 } from "lucide-react";
 
 import { PageContainer } from "@/components/layout/page-container";
@@ -47,13 +48,20 @@ import { buildLookups, toAssetRow, type AssetRow } from "@/lib/assets/view";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useAuth } from "@/lib/auth/auth-context";
 import {
+  BulkAssignDialog,
   BulkTransferDialog,
   BulkChangeStatusDialog,
   BulkPrintLabelsDialog,
   BulkUpdateConditionDialog,
 } from "@/components/assets/bulk-action-dialogs";
 
-type BulkDialog = "transfer" | "status" | "condition" | "print" | null;
+type BulkDialog =
+  | "transfer"
+  | "status"
+  | "assign"
+  | "condition"
+  | "print"
+  | null;
 
 // Stable empty array so the RBAC memo doesn't recompute every render.
 const NO_VENUES: string[] = [];
@@ -353,6 +361,14 @@ export default function AssetsPage() {
                 <Button
                   variant="secondary"
                   size="sm"
+                  onClick={() => setBulkDialog("assign")}
+                >
+                  <UserCog className="size-4" />
+                  Reassign custody
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setBulkDialog("condition")}
                 >
                   <ClipboardCheck className="size-4" />
@@ -591,6 +607,14 @@ export default function AssetsPage() {
         open={bulkDialog === "status"}
         onOpenChange={(o) => !o && setBulkDialog(null)}
         assetIds={selectedIds}
+        resolveTag={resolveTag}
+        onDone={() => setSelectedIds([])}
+      />
+      <BulkAssignDialog
+        open={bulkDialog === "assign"}
+        onOpenChange={(o) => !o && setBulkDialog(null)}
+        assetIds={selectedIds}
+        users={usersQuery.data ?? []}
         resolveTag={resolveTag}
         onDone={() => setSelectedIds([])}
       />

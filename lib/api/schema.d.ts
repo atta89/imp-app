@@ -1304,6 +1304,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assets/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reassign the custodian on many assets at once. Same all-or-nothing contract as bulk transfer: any per-item failure aborts the batch and returns per-row diagnostics. Assets already assigned to the target user are silently skipped as no-ops. Exactly one digest email is enqueued to the new custodian listing all newly assigned assets. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BulkAssignRequest"];
+                };
+            };
+            responses: {
+                /** @description batch summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["BulkAssignResponse"];
+                        };
+                    };
+                };
+                400: components["responses"]["ErrorResponse"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assets/condition/bulk": {
         parameters: {
             query?: never;
@@ -2760,6 +2803,11 @@ export interface components {
             status: components["schemas"]["AssetStatus"];
             reason?: string;
         };
+        BulkAssignRequest: {
+            assetIds: components["schemas"]["ObjectId"][];
+            responsibleUserId: components["schemas"]["ObjectId"];
+            notes?: string;
+        };
         BulkActionResult: {
             assetId: components["schemas"]["ObjectId"];
             ok: boolean;
@@ -2770,6 +2818,14 @@ export interface components {
             total: number;
             succeeded: number;
             failed: number;
+            results: components["schemas"]["BulkActionResult"][];
+        };
+        BulkAssignResponse: {
+            total: number;
+            /** @description Assets whose responsibleUserId changed; one custody_change Movement was written for each. */
+            updated: number;
+            /** @description Assets already assigned to responsibleUserId; no movement written. */
+            skippedNoOp: number;
             results: components["schemas"]["BulkActionResult"][];
         };
         BulkConditionUpdate: {
