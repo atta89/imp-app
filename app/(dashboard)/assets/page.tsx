@@ -34,7 +34,13 @@ import { ConditionBadge } from "@/components/assets/condition-badge";
 import { ResponsibleCell } from "@/components/assets/responsible-cell";
 import { AssetCard } from "@/components/assets/asset-card";
 import { formatRelative, formatDate } from "@/lib/format";
-import { useAssets, useVenues, useCategories, useUsers } from "@/lib/api/hooks";
+import {
+  useAssets,
+  useVenues,
+  useCategories,
+  useUsers,
+  useAssetDepartments,
+} from "@/lib/api/hooks";
 import { queryKeys, type AssetFilters } from "@/lib/api/query-keys";
 import type { Asset, AssetStatus } from "@/lib/api/types";
 import { buildLookups, toAssetRow, type AssetRow } from "@/lib/assets/view";
@@ -73,6 +79,7 @@ export default function AssetsPage() {
 
   const [search, setSearch] = React.useState("");
   const [venue, setVenue] = React.useState("");
+  const [department, setDepartment] = React.useState("");
   const [category, setCategory] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [awayOnly, setAwayOnly] = React.useState(false);
@@ -84,23 +91,36 @@ export default function AssetsPage() {
   const hasFilters =
     search !== "" ||
     venue !== "" ||
+    department !== "" ||
     category !== "" ||
     status !== "" ||
     awayOnly;
 
   // Reset to page 1 whenever any filter changes (render-time, no effect).
-  const filterKey = `${debouncedSearch}|${venue}|${category}|${status}|${awayOnly}`;
+  const filterKey = `${debouncedSearch}|${venue}|${department}|${category}|${status}|${awayOnly}`;
   const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setPage(1);
   }
 
+  // The department filter is scoped to the venue filter; clear it whenever
+  // the venue changes (render-time).
+  const [prevVenue, setPrevVenue] = React.useState(venue);
+  if (venue !== prevVenue) {
+    setPrevVenue(venue);
+    if (department !== "") setDepartment("");
+  }
+
+  const departmentsQuery = useAssetDepartments(venue);
+  const departments = departmentsQuery.data ?? [];
+
   const filters: AssetFilters = {
     page,
     limit: PAGE_SIZE,
     q: debouncedSearch || undefined,
     venue: venue || undefined,
+    department: department || undefined,
     category: category || undefined,
     status: (status || undefined) as AssetStatus | undefined,
     away: awayOnly || undefined,
@@ -158,6 +178,7 @@ export default function AssetsPage() {
   function clearFilters() {
     setSearch("");
     setVenue("");
+    setDepartment("");
     setCategory("");
     setStatus("");
     setAwayOnly(false);
@@ -378,6 +399,23 @@ export default function AssetsPage() {
                 {(venuesQuery.data ?? []).map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                aria-label="Filter by department"
+                className="w-full sm:w-auto"
+                disabled={!venue}
+                title={!venue ? "Pick a venue first" : undefined}
+              >
+                <option value="">
+                  {venue ? "All departments" : "Pick a venue first"}
+                </option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
                   </option>
                 ))}
               </Select>
