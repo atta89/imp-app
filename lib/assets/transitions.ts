@@ -10,6 +10,7 @@ import {
   CircleSlash,
   Search,
   ClipboardCheck,
+  Home,
 } from "lucide-react";
 
 import type { AssetStatus } from "@/lib/api/types";
@@ -19,7 +20,8 @@ export type AssetActionType =
   | "transfer"
   | "assign"
   | "repair"
-  | "condition";
+  | "condition"
+  | "home";
 
 export interface AssetAction {
   id: string;
@@ -61,6 +63,13 @@ const updateCondition: AssetAction = {
   type: "condition",
   overflow: true,
 };
+const changeHome: AssetAction = {
+  id: "home",
+  label: "Change home",
+  icon: Home,
+  type: "home",
+  overflow: true,
+};
 const retire: AssetAction = {
   id: "retire",
   label: "Retire",
@@ -88,6 +97,7 @@ export function assetActions(status: AssetStatus): AssetAction[] {
         transfer,
         assign,
         updateCondition,
+        changeHome,
         sendToRepair,
         retire,
         markLost,
@@ -98,6 +108,7 @@ export function assetActions(status: AssetStatus): AssetAction[] {
         transfer,
         assign,
         updateCondition,
+        changeHome,
         sendToRepair,
         retire,
         markLost,
@@ -108,6 +119,7 @@ export function assetActions(status: AssetStatus): AssetAction[] {
         { id: "unrepairable", label: "Mark unrepairable", icon: Ban, type: "status", targetStatus: "retired", tone: "destructive", overflow: true },
         assign,
         updateCondition,
+        changeHome,
         markLost,
       ];
     case "lost":

@@ -43,6 +43,7 @@ import {
   SendToRepairDialog,
   UpdateConditionDialog,
 } from "@/components/assets/action-dialogs";
+import { ChangeHomeDialog } from "@/components/assets/change-home-dialog";
 import { assetActions, type AssetAction } from "@/lib/assets/transitions";
 import { buildLookups, toAssetRow } from "@/lib/assets/view";
 import { ApiError } from "@/lib/api/errors";
@@ -52,6 +53,7 @@ import {
   useVenues,
   useCategories,
   useUsers,
+  useAssetDepartments,
 } from "@/lib/api/hooks";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatDate } from "@/lib/format";
@@ -77,10 +79,22 @@ export default function AssetDetailPage() {
   const venuesQuery = useVenues();
   const categoriesQuery = useCategories();
   const usersQuery = useUsers();
+  const departmentsQuery = useAssetDepartments(assetQuery.data?.homeVenueId);
 
   const lookups = React.useMemo(
-    () => buildLookups(venuesQuery.data, categoriesQuery.data, usersQuery.data),
-    [venuesQuery.data, categoriesQuery.data, usersQuery.data],
+    () =>
+      buildLookups(
+        venuesQuery.data,
+        categoriesQuery.data,
+        usersQuery.data,
+        departmentsQuery.data,
+      ),
+    [
+      venuesQuery.data,
+      categoriesQuery.data,
+      usersQuery.data,
+      departmentsQuery.data,
+    ],
   );
 
   const [active, setActive] = React.useState<AssetAction | null>(null);
@@ -249,6 +263,14 @@ export default function AssetDetailPage() {
                 <dl className="divide-y divide-border">
                   <DetailRow label="Category" value={row.categoryName} />
                   <DetailRow label="Home venue" value={row.homeVenueName} />
+                  <DetailRow
+                    label="Home department"
+                    value={
+                      row.departmentName ?? (
+                        <span className="text-text-tertiary">—</span>
+                      )
+                    }
+                  />
                   <DetailRow
                     label="Current location"
                     value={
@@ -420,6 +442,14 @@ export default function AssetDetailPage() {
         open={active?.type === "condition"}
         onOpenChange={(o) => !o && setActive(null)}
         currentCondition={asset.condition}
+      />
+      <ChangeHomeDialog
+        assetId={id}
+        open={active?.type === "home"}
+        onOpenChange={(o) => !o && setActive(null)}
+        venues={venuesQuery.data ?? []}
+        currentHomeVenueId={asset.homeVenueId}
+        currentDepartmentId={asset.departmentId}
       />
     </PageContainer>
   );

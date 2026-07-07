@@ -1,21 +1,30 @@
-import type { Asset, Category, User, Venue } from "@/lib/api/types";
+import type {
+  Asset,
+  Category,
+  Department,
+  User,
+  Venue,
+} from "@/lib/api/types";
 
 /** Reference-data maps for resolving the IDs on an Asset to display labels. */
 export interface AssetLookups {
   venues: Map<string, Venue>;
   categories: Map<string, Category>;
   users: Map<string, User>;
+  departments: Map<string, Department>;
 }
 
 export function buildLookups(
   venues: Venue[] = [],
   categories: Category[] = [],
   users: User[] = [],
+  departments: Department[] = [],
 ): AssetLookups {
   return {
     venues: new Map(venues.map((v) => [v.id, v])),
     categories: new Map(categories.map((c) => [c.id, c])),
     users: new Map(users.map((u) => [u.id, u])),
+    departments: new Map(departments.map((d) => [d.id, d])),
   };
 }
 
@@ -28,6 +37,7 @@ export interface AssetRow {
   categoryName: string;
   homeVenueName: string;
   currentVenueName: string;
+  departmentName?: string;
   status: Asset["status"];
   condition: Asset["condition"];
   responsibleName?: string;
@@ -50,6 +60,9 @@ export function toAssetRow(asset: Asset, lookups: AssetLookups): AssetRow {
     categoryName: lookups.categories.get(asset.categoryId)?.name ?? "—",
     homeVenueName: lookups.venues.get(asset.homeVenueId)?.name ?? "—",
     currentVenueName: lookups.venues.get(asset.currentVenueId)?.name ?? "—",
+    departmentName: asset.departmentId
+      ? lookups.departments.get(asset.departmentId)?.name
+      : undefined,
     status: asset.status,
     condition: asset.condition,
     responsibleName: responsible?.name,
