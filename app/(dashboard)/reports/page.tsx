@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { PlaneTakeoff, AlertTriangle, Wrench } from "lucide-react";
+import { PlaneTakeoff, AlertTriangle, Wrench, Building2 } from "lucide-react";
 
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select } from "@/components/ui/select";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ResponsibleCell } from "@/components/assets/responsible-cell";
@@ -26,10 +27,12 @@ import {
   useAssetsAwayReport,
   useAssetsOverdueReport,
   useInRepairReport,
+  useReportByDepartment,
   useVenues,
   useCategories,
   useUsers,
 } from "@/lib/api/hooks";
+import { useAuth } from "@/lib/auth/auth-context";
 import { buildLookups, toAssetRow, type AssetRow } from "@/lib/assets/view";
 import { REPAIR_STATUS } from "@/lib/status-meta";
 import { formatDate } from "@/lib/format";
@@ -62,6 +65,9 @@ function ChartCard({
 
 export default function ReportsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const inventory = useInventoryByVenue();
   const byResponsible = useByResponsibleReport();
   const away = useAssetsAwayReport();
@@ -70,6 +76,14 @@ export default function ReportsPage() {
   const venuesQuery = useVenues();
   const categoriesQuery = useCategories();
   const usersQuery = useUsers();
+
+  // By-department report: admins can leave the venue blank for all venues;
+  // non-admins must pick one (the backend rejects a missing venue for them).
+  const [deptVenue, setDeptVenue] = React.useState("");
+  const canFireByDept = isAdmin || Boolean(deptVenue);
+  const byDept = useReportByDepartment(deptVenue || undefined, {
+    enabled: canFireByDept,
+  });
 
   const lookups = React.useMemo(
     () => buildLookups(venuesQuery.data, categoriesQuery.data, usersQuery.data),
@@ -216,6 +230,113 @@ export default function ReportsPage() {
             }))}
           />
         </div>
+
+        {/* Per-venue department breakdown, inline pills under each venue name. */}
+        <Section>
+          <SectionHeader
+            title="Departments by venue"
+            description="A per-venue breakdown of asset counts by home department."
+          />
+          <Card>
+            <CardContent className="p-5 sm:p-6">
+              {inventory.isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-6 w-full" />
+                  ))}
+                </div>
+              ) : (inventory.data ?? []).length === 0 ? (
+                <EmptyState
+                  icon={Building2}
+                  title="No venues yet"
+                  description="Add a venue to start seeing this breakdown."
+                />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {(inventory.data ?? []).map((row) => (
+                    <li
+                      key={row.venueId}
+                      className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium text-foreground">
+                          {row.venueName}
+                        </span>
+                        <span className="text-xs text-text-tertiary tabular-nums">
+                          {row.total} asset{row.total === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(row.byDepartment ?? []).length === 0 ? (
+                          <span className="text-xs text-text-tertiary">
+                            No departments
+                          </span>
+                        ) : (
+                          (row.byDepartment ?? []).map((d) => (
+                            <Badge key={d.departmentId} color="gray">
+                              {d.departmentName}
+                              <span className="ml-1 text-text-tertiary tabular-nums">
+                                {d.count}
+                              </span>
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </Section>
+
+        <Section>
+          <SectionHeader
+            title="By department"
+            description={
+              isAdmin
+                ? "Asset counts per department. Leave the venue blank to see every venue."
+                : "Pick a venue to see its department breakdown."
+            }
+            action={
+              <Select
+                value={deptVenue}
+                onChange={(e) => setDeptVenue(e.target.value)}
+                aria-label="Venue"
+                className="w-56"
+              >
+                <option value="">
+                  {isAdmin ? "All venues" : "Select a venue…"}
+                </option>
+                {(venuesQuery.data ?? []).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </Select>
+            }
+          />
+          <Card>
+            <CardContent className="p-5 sm:p-6">
+              {!canFireByDept ? (
+                <EmptyState
+                  icon={Building2}
+                  title="Pick a venue"
+                  description="Choose a venue above to see its department breakdown."
+                />
+              ) : byDept.isLoading ? (
+                <Skeleton className="h-[260px] w-full" />
+              ) : (
+                <HorizontalBarChart
+                  data={(byDept.data ?? []).map((r) => ({
+                    label: r.departmentName,
+                    value: r.count,
+                  }))}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </Section>
 
         <Section>
           <SectionHeader
