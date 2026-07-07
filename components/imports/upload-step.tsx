@@ -18,6 +18,7 @@ const OPTIONAL_COLUMNS: { col: string; fallback: string }[] = [
   { col: "currentVenueCode", fallback: "home venue" },
   { col: "condition", fallback: "good" },
   { col: "responsibleUserEmail", fallback: "the PO owner" },
+  { col: "departmentCode", fallback: "no department" },
 ];
 
 export function UploadStep({
