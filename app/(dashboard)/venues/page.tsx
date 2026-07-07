@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Plus,
@@ -32,6 +33,7 @@ import { ApiError } from "@/lib/api/errors";
 import type { Venue } from "@/lib/api/types";
 
 export default function VenuesPage() {
+  const router = useRouter();
   const venuesQuery = useVenues();
   const summaryQuery = useDashboardSummary();
   const deleteMut = useDeleteVenue();
@@ -132,28 +134,37 @@ export default function VenuesPage() {
       className: "w-[64px]",
       skeletonClassName: "ml-auto w-8",
       cell: (v) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="tertiary" size="icon-sm" aria-label="Venue actions">
-              <MoreHorizontal className="size-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem
-              onSelect={() => {
-                setEditing(v);
-                setFormOpen(true);
-              }}
-            >
-              <Pencil />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem destructive onSelect={() => setDeleting(v)}>
-              <Trash2 />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <span
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex"
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="tertiary"
+                size="icon-sm"
+                aria-label="Venue actions"
+              >
+                <MoreHorizontal className="size-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setEditing(v);
+                  setFormOpen(true);
+                }}
+              >
+                <Pencil />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem destructive onSelect={() => setDeleting(v)}>
+                <Trash2 />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </span>
       ),
     },
   ];
@@ -198,6 +209,7 @@ export default function VenuesPage() {
             getRowId={(v) => v.id}
             loading={venuesQuery.isLoading}
             skeletonRows={5}
+            onRowClick={(v) => router.push(`/venues/${v.id}`)}
             empty={
               <EmptyState
                 icon={Building2}
