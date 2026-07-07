@@ -24,6 +24,12 @@ export const queryKeys = {
   venues: {
     all: ["venues"] as const,
   },
+  departments: {
+    all: (venueId: string) => ["departments", venueId] as const,
+    list: (venueId: string) => ["departments", venueId, "list"] as const,
+    detail: (venueId: string, id: string) =>
+      ["departments", venueId, "detail", id] as const,
+  },
   categories: {
     all: ["categories"] as const,
   },
@@ -47,6 +53,8 @@ export const queryKeys = {
     assetsOverdue: ["reports", "assets-overdue"] as const,
     inRepair: ["reports", "in-repair"] as const,
     byResponsible: ["reports", "by-responsible"] as const,
+    byDepartment: (venueId?: string) =>
+      ["reports", "by-department", venueId ?? ""] as const,
   },
   notifications: {
     preferences: ["me", "notification-preferences"] as const,

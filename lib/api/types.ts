@@ -6,6 +6,13 @@ export type Asset = components["schemas"]["Asset"];
 export type AssetStatus = components["schemas"]["AssetStatus"];
 export type AssetCondition = components["schemas"]["AssetCondition"];
 export type Venue = components["schemas"]["Venue"];
+export type Department = components["schemas"]["Department"];
+export type CreateDepartmentRequest =
+  components["schemas"]["CreateDepartmentRequest"];
+export type UpdateDepartmentRequest =
+  components["schemas"]["UpdateDepartmentRequest"];
+export type DepartmentAssetCountRow =
+  components["schemas"]["DepartmentAssetCountRow"];
 export type Category = components["schemas"]["Category"];
 export type CategoryCustomField = components["schemas"]["CategoryCustomField"];
 export type User = components["schemas"]["User"];

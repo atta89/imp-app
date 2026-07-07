@@ -134,6 +134,22 @@ function useAssetMutationInvalidation(id: string) {
   };
 }
 
+/**
+ * Generic asset PUT — used for edits that don't have a dedicated verb (e.g.
+ * changing the home venue / home department). The backend enforces the
+ * "department belongs to home venue" invariant; surface any 400 via
+ * `applyFormError`.
+ */
+export function useUpdateAsset(id: string) {
+  const invalidate = useAssetMutationInvalidation(id);
+  return useMutation({
+    mutationFn: async (body: components["schemas"]["UpdateAssetRequest"]) =>
+      unwrap(await api.PUT("/assets/{id}", { params: { path: { id } }, body }))
+        .data,
+    onSuccess: invalidate,
+  });
+}
+
 export function useTransferAsset(id: string) {
   const invalidate = useAssetMutationInvalidation(id);
   return useMutation({
@@ -305,6 +321,27 @@ export function useByResponsibleReport() {
   });
 }
 
+/**
+ * Per-department asset counts. `venueId` is required for non-admins; the
+ * server returns 400 without it. Callers pass `enabled={Boolean(venueId)}`
+ * when they can't know the caller's role at fire time.
+ */
+export function useReportByDepartment(
+  venueId?: string,
+  opts: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.reports.byDepartment(venueId),
+    enabled: opts.enabled ?? true,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/reports/by-department", {
+          params: { query: venueId ? { venue: venueId } : {} },
+        }),
+      ).data ?? [],
+  });
+}
+
 // ── Purchase orders ──────────────────────────────────────────────────────────
 
 export function usePurchaseOrders(status?: string) {
@@ -471,6 +508,88 @@ export function useBulkQrPdf() {
       unwrap(
         await api.POST("/assets/qr/bulk", { body, parseAs: "blob" }),
       ) as Blob,
+  });
+}
+
+// ── Departments (venue-scoped) ───────────────────────────────────────────────
+
+export function useDepartments(venueId: string) {
+  return useQuery({
+    queryKey: queryKeys.departments.list(venueId),
+    enabled: Boolean(venueId),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/venues/{venueId}/departments", {
+          params: { path: { venueId } },
+        }),
+      ).data ?? [],
+  });
+}
+
+/**
+ * Convenience wrapper for asset forms that pick a home department: when the
+ * asset has no home venue selected yet, we don't fire a request and return
+ * a stable empty array shape from the outer components.
+ */
+export function useAssetDepartments(homeVenueId?: string) {
+  return useDepartments(homeVenueId ?? "");
+}
+
+export function useDepartment(venueId: string, id: string) {
+  return useQuery({
+    queryKey: queryKeys.departments.detail(venueId, id),
+    enabled: Boolean(venueId) && Boolean(id),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/venues/{venueId}/departments/{id}", {
+          params: { path: { venueId, id } },
+        }),
+      ).data,
+  });
+}
+
+export function useCreateDepartment(venueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: components["schemas"]["CreateDepartmentRequest"]) =>
+      unwrap(
+        await api.POST("/venues/{venueId}/departments", {
+          params: { path: { venueId } },
+          body,
+        }),
+      ).data,
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.departments.all(venueId) }),
+  });
+}
+
+export function useUpdateDepartment(venueId: string, id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: components["schemas"]["UpdateDepartmentRequest"]) =>
+      unwrap(
+        await api.PUT("/venues/{venueId}/departments/{id}", {
+          params: { path: { venueId, id } },
+          body,
+        }),
+      ).data,
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.departments.all(venueId) }),
+  });
+}
+
+export function useDeleteDepartment(venueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.DELETE("/venues/{venueId}/departments/{id}", {
+        params: { path: { venueId, id } },
+      });
+      if (res.error || !res.response.ok)
+        throw toApiError(res.error, res.response.status);
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.departments.all(venueId) }),
   });
 }
 
