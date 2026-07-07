@@ -46,6 +46,13 @@ const CATEGORIES = [
   { id: "ca5", name: "Camera", slug: "camera", customFields: [], ...stamp },
 ];
 
+const DEPARTMENTS = [
+  { id: "de1", venueId: "ve1", name: "Engineering", code: "ENG", description: "Software team", ...stamp },
+  { id: "de2", venueId: "ve1", name: "Operations", code: "OPS", ...stamp },
+  { id: "de3", venueId: "ve2", name: "Production", code: "PROD", description: "Studio production crew", ...stamp },
+  { id: "de4", venueId: "ve4", name: "Front of House", code: "FOH", ...stamp },
+];
+
 const U = (id, name, position) => ({
   id,
   name,
@@ -82,18 +89,18 @@ const A = (o) => {
 };
 
 const ASSETS = [
-  A({ assetTag: "LAP-0001", name: 'MacBook Pro 14"', serialNumber: "C02ZK1", categoryId: "ca1", homeVenueId: "ve1", currentVenueId: "ve1", status: "in_use", responsibleUserId: "us3", updatedAt: agoHours(10) }),
-  A({ assetTag: "LAP-0002", name: 'MacBook Air 13"', serialNumber: "C02ZK2", categoryId: "ca1", homeVenueId: "ve1", currentVenueId: "ve2", status: "in_use", responsibleUserId: "us4", updatedAt: agoHours(30), expectedReturnDate: daysAgo(4), isOverdue: true }),
+  A({ assetTag: "LAP-0001", name: 'MacBook Pro 14"', serialNumber: "C02ZK1", categoryId: "ca1", homeVenueId: "ve1", currentVenueId: "ve1", departmentId: "de1", status: "in_use", responsibleUserId: "us3", updatedAt: agoHours(10) }),
+  A({ assetTag: "LAP-0002", name: 'MacBook Air 13"', serialNumber: "C02ZK2", categoryId: "ca1", homeVenueId: "ve1", currentVenueId: "ve2", departmentId: "de1", status: "in_use", responsibleUserId: "us4", updatedAt: agoHours(30), expectedReturnDate: daysAgo(4), isOverdue: true }),
   A({ assetTag: "CHR-0014", name: "Aeron Chair", categoryId: "ca2", homeVenueId: "ve4", currentVenueId: "ve4", status: "available", condition: "fair", responsibleUserId: "us2", updatedAt: daysAgo(8) }),
-  A({ assetTag: "PRJ-0003", name: "Epson EB-2250U", serialNumber: "X5J9PR", categoryId: "ca4", homeVenueId: "ve4", currentVenueId: "ve5", status: "in_use", responsibleUserId: "us4", updatedAt: agoHours(5), expectedReturnDate: inDays(5) }),
-  A({ assetTag: "CAM-0007", name: "Sony A7 IV", serialNumber: "SN-AA71", categoryId: "ca5", homeVenueId: "ve2", currentVenueId: "ve2", status: "in_repair", condition: "poor", responsibleUserId: "us6", updatedAt: daysAgo(3) }),
+  A({ assetTag: "PRJ-0003", name: "Epson EB-2250U", serialNumber: "X5J9PR", categoryId: "ca4", homeVenueId: "ve4", currentVenueId: "ve5", departmentId: "de4", status: "in_use", responsibleUserId: "us4", updatedAt: agoHours(5), expectedReturnDate: inDays(5) }),
+  A({ assetTag: "CAM-0007", name: "Sony A7 IV", serialNumber: "SN-AA71", categoryId: "ca5", homeVenueId: "ve2", currentVenueId: "ve2", departmentId: "de3", status: "in_repair", condition: "poor", responsibleUserId: "us6", updatedAt: daysAgo(3) }),
   A({ assetTag: "TBL-0021", name: "Folding Table 6ft", categoryId: "ca3", homeVenueId: "ve3", currentVenueId: "ve3", status: "available", responsibleUserId: "us5", updatedAt: daysAgo(11) }),
   A({ assetTag: "LAP-0008", name: "Dell XPS 15", serialNumber: "DX15-92", categoryId: "ca1", homeVenueId: "ve1", currentVenueId: "ve3", status: "in_use", condition: "fair", responsibleUserId: "us3", updatedAt: daysAgo(1), expectedReturnDate: daysAgo(5), isOverdue: true }),
   A({ assetTag: "CHR-0031", name: "Steelcase Leap", categoryId: "ca2", homeVenueId: "ve4", currentVenueId: "ve4", status: "retired", condition: "poor", responsibleUserId: "us2", updatedAt: daysAgo(27) }),
   A({ assetTag: "CAM-0012", name: "Canon EOS R6", serialNumber: "CR6-118", categoryId: "ca5", homeVenueId: "ve2", currentVenueId: "ve1", status: "in_use", responsibleUserId: "us4", updatedAt: agoHours(2), expectedReturnDate: inDays(9) }),
   A({ assetTag: "PRJ-0006", name: "BenQ TK700", categoryId: "ca4", homeVenueId: "ve5", currentVenueId: "ve5", status: "available", condition: "new", responsibleUserId: "us5", updatedAt: daysAgo(4) }),
   A({ assetTag: "LAP-0015", name: "ThinkPad X1", serialNumber: "TP-X1-7", categoryId: "ca1", homeVenueId: "ve3", currentVenueId: "ve3", status: "lost", responsibleUserId: "us3", updatedAt: daysAgo(16) }),
-  A({ assetTag: "TBL-0009", name: "Conference Table", categoryId: "ca3", homeVenueId: "ve1", currentVenueId: "ve1", status: "in_use", responsibleUserId: "us1", updatedAt: agoHours(20) }),
+  A({ assetTag: "TBL-0009", name: "Conference Table", categoryId: "ca3", homeVenueId: "ve1", currentVenueId: "ve1", departmentId: "de2", status: "in_use", responsibleUserId: "us1", updatedAt: agoHours(20) }),
   A({ assetTag: "CHR-0042", name: "Task Chair", categoryId: "ca2", homeVenueId: "ve2", currentVenueId: "ve4", status: "available", condition: "fair", responsibleUserId: "us2", updatedAt: daysAgo(9) }),
   A({ assetTag: "CAM-0019", name: "GoPro Hero 12", serialNumber: "GP12-44", categoryId: "ca5", homeVenueId: "ve5", currentVenueId: "ve5", status: "in_repair", condition: "poor", responsibleUserId: "us6", updatedAt: daysAgo(5) }),
   A({ assetTag: "LAP-0022", name: 'MacBook Pro 16"', serialNumber: "MBP16-3", categoryId: "ca1", homeVenueId: "ve1", currentVenueId: "ve1", status: "available", condition: "new", responsibleUserId: "us3", updatedAt: agoHours(33) }),
@@ -159,7 +166,7 @@ function makeImportPreview() {
 }
 
 let assetSeq = ASSETS.length;
-function generateAssets(po, venueId) {
+function generateAssets(po, venueId, departmentId) {
   const ids = [];
   for (const li of po.lineItems) {
     for (let k = 0; k < li.quantity; k++) {
@@ -173,6 +180,7 @@ function generateAssets(po, venueId) {
         categoryId: li.categoryId,
         homeVenueId: venueId,
         currentVenueId: venueId,
+        departmentId: departmentId || undefined,
         status: "available",
         condition: "new",
         responsibleUserId: po.responsibleUserId,
@@ -202,6 +210,8 @@ function listAssets(q) {
   if (q.get("currentVenue"))
     items = items.filter((a) => a.currentVenueId === q.get("currentVenue"));
   if (q.get("category")) items = items.filter((a) => a.categoryId === q.get("category"));
+  if (q.get("department"))
+    items = items.filter((a) => a.departmentId === q.get("department"));
   if (q.get("status")) items = items.filter((a) => a.status === q.get("status"));
   if (q.get("responsible"))
     items = items.filter((a) => a.responsibleUserId === q.get("responsible"));
@@ -357,8 +367,41 @@ const server = createServer(async (req, res) => {
       const inV = ASSETS.filter((a) => a.homeVenueId === v.id);
       const byStatus = {};
       for (const a of inV) byStatus[a.status] = (byStatus[a.status] || 0) + 1;
-      return { venueId: v.id, venueName: v.name, total: inV.length, byStatus };
+      const deptMap = new Map();
+      for (const a of inV) {
+        if (!a.departmentId) continue;
+        deptMap.set(a.departmentId, (deptMap.get(a.departmentId) || 0) + 1);
+      }
+      const byDepartment = [...deptMap.entries()].map(([id, count]) => {
+        const d = DEPARTMENTS.find((x) => x.id === id);
+        return {
+          departmentId: id,
+          departmentName: d?.name ?? "Unknown",
+          count,
+        };
+      });
+      return {
+        venueId: v.id,
+        venueName: v.name,
+        total: inV.length,
+        byStatus,
+        byDepartment,
+      };
     }).filter((r) => r.total > 0);
+    return send(res, 200, { data: rows });
+  }
+  if (path === "/reports/by-department") {
+    const scope = url.searchParams.get("venue");
+    const inScope = scope
+      ? DEPARTMENTS.filter((d) => d.venueId === scope)
+      : DEPARTMENTS;
+    const rows = inScope
+      .map((d) => ({
+        departmentId: d.id,
+        departmentName: d.name,
+        count: ASSETS.filter((a) => a.departmentId === d.id).length,
+      }))
+      .filter((r) => r.count > 0);
     return send(res, 200, { data: rows });
   }
   if (path === "/reports/assets-away")
@@ -378,6 +421,55 @@ const server = createServer(async (req, res) => {
       return { userId: uid, userName: u?.name ?? "Unknown", position: u?.position, count };
     });
     return send(res, 200, { data: rows });
+  }
+
+  // Venue-scoped departments — must match before the generic /venues/{id}.
+  const deptCollection = path.match(/^\/venues\/([^/]+)\/departments$/);
+  if (deptCollection) {
+    const venueId = deptCollection[1];
+    const venue = VENUES.find((v) => v.id === venueId);
+    if (!venue)
+      return send(res, 404, { error: { kind: "not_found", message: "Venue not found." } });
+    if (req.method === "POST") {
+      if (DEPARTMENTS.some((d) => d.venueId === venueId && d.code === body.code))
+        return send(res, 409, { error: { kind: "conflict", message: "A department with this code already exists in this venue." } });
+      const d = {
+        id: `de${Date.now()}`,
+        venueId,
+        name: body.name,
+        code: body.code,
+        description: body.description,
+        isActive: body.isActive ?? true,
+        createdAt: iso(Date.now()),
+        updatedAt: iso(Date.now()),
+      };
+      DEPARTMENTS.push(d);
+      return send(res, 201, { data: d });
+    }
+    const items = DEPARTMENTS.filter((d) => d.venueId === venueId);
+    return send(res, 200, {
+      data: items,
+      meta: { pagination: { page: 1, limit: 25, total: items.length, totalPages: 1 } },
+    });
+  }
+  const deptOne = path.match(/^\/venues\/([^/]+)\/departments\/([^/]+)$/);
+  if (deptOne) {
+    const [, deptVenueId, deptIdStr] = deptOne;
+    const d = DEPARTMENTS.find((x) => x.id === deptIdStr && x.venueId === deptVenueId);
+    if (!d) return send(res, 404, { error: { kind: "not_found", message: "Department not found." } });
+    if (req.method === "PUT") {
+      const patch = { ...body };
+      delete patch.venueId;
+      Object.assign(d, patch, { updatedAt: iso(Date.now()) });
+      return send(res, 200, { data: d });
+    }
+    if (req.method === "DELETE") {
+      if (ASSETS.some((a) => a.departmentId === d.id))
+        return send(res, 409, { error: { kind: "conflict", message: "Department is still used by assets; reassign them first." } });
+      DEPARTMENTS.splice(DEPARTMENTS.indexOf(d), 1);
+      return sendRaw(res, 204, "application/json", "");
+    }
+    return send(res, 200, { data: d });
   }
 
   const venueId = path.match(/^\/venues\/([^/]+)$/);
@@ -418,7 +510,7 @@ const server = createServer(async (req, res) => {
 
   // Bulk import
   if (path === "/imports/purchase-orders/template")
-    return sendRaw(res, 200, "text/csv", "poNumber,supplierName,categorySlug,itemName,quantity,assetTag,status,currentVenueCode,condition,responsibleUserEmail\nPO-2001,TechWorld,laptop,MacBook Pro 14\",5,,,,,\n");
+    return sendRaw(res, 200, "text/csv", "poNumber,supplierName,categorySlug,itemName,quantity,assetTag,status,currentVenueCode,condition,responsibleUserEmail,departmentCode\nPO-2001,TechWorld,laptop,MacBook Pro 14\",5,,,,,,\n");
   if (path === "/imports/purchase-orders/validate" && req.method === "POST")
     return send(res, 200, { data: makeImportPreview() });
   if (path === "/imports/purchase-orders/commit" && req.method === "POST") {
@@ -467,7 +559,20 @@ const server = createServer(async (req, res) => {
   if (poReceive && req.method === "POST") {
     const po = PURCHASE_ORDERS.find((p) => p.id === poReceive[1]);
     if (!po) return send(res, 404, { error: { kind: "not_found", message: "PO not found." } });
-    const ids = generateAssets(po, body.venueId);
+    if (body.departmentId) {
+      const d = DEPARTMENTS.find((x) => x.id === body.departmentId);
+      if (!d || d.venueId !== body.venueId)
+        return send(res, 400, {
+          error: {
+            kind: "validation",
+            message: "Department does not belong to the receive venue.",
+            fields: {
+              departmentId: "Department does not belong to the receive venue.",
+            },
+          },
+        });
+    }
+    const ids = generateAssets(po, body.venueId, body.departmentId);
     po.status = "received";
     po.receivedDate = iso(Date.now());
     po.updatedAt = iso(Date.now());
@@ -542,6 +647,9 @@ const server = createServer(async (req, res) => {
         homeVenueName: nameOf(VENUES, asset.homeVenueId),
         currentVenueName: nameOf(VENUES, asset.currentVenueId),
         categoryName: nameOf(CATEGORIES, asset.categoryId),
+        departmentName: asset.departmentId
+          ? nameOf(DEPARTMENTS, asset.departmentId)
+          : undefined,
       },
     });
   }
@@ -629,8 +737,48 @@ const server = createServer(async (req, res) => {
   const one = path.match(/^\/assets\/([^/]+)$/);
   if (one) {
     const asset = findAsset(one[1]);
-    if (asset) return send(res, 200, { data: asset });
-    return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
+    if (!asset)
+      return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
+    if (req.method === "PUT") {
+      const patch = { ...body };
+      const nextHome = patch.homeVenueId ?? asset.homeVenueId;
+      const nextDept =
+        Object.prototype.hasOwnProperty.call(patch, "departmentId")
+          ? patch.departmentId
+          : asset.departmentId;
+      if (nextDept) {
+        const d = DEPARTMENTS.find((x) => x.id === nextDept);
+        if (!d || d.venueId !== nextHome) {
+          return send(res, 400, {
+            error: {
+              kind: "validation",
+              message: "Department does not belong to the asset's home venue.",
+              fields: {
+                departmentId:
+                  "Department does not belong to the asset's home venue.",
+              },
+            },
+          });
+        }
+      }
+      if (patch.homeVenueId && patch.homeVenueId !== asset.homeVenueId)
+        pushHistory(asset.id, {
+          type: "transfer",
+          fromVenueId: asset.homeVenueId,
+          toVenueId: patch.homeVenueId,
+          notes: "Home venue changed",
+        });
+      Object.assign(asset, patch, {
+        departmentId: nextDept || undefined,
+        updatedAt: iso(Date.now()),
+      });
+      return send(res, 200, { data: asset });
+    }
+    if (req.method === "DELETE") {
+      ASSETS.splice(ASSETS.indexOf(asset), 1);
+      return sendRaw(res, 204, "application/json", "");
+    }
+    return send(res, 200, { data: asset });
   }
 
   return send(res, 200, {
