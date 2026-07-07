@@ -435,6 +435,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/venues/{venueId}/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venueId: string;
+            };
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: components["parameters"]["PageParam"];
+                    limit?: components["parameters"]["LimitParam"];
+                };
+                header?: never;
+                path: {
+                    venueId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["Department"][];
+                            meta?: components["schemas"]["Meta"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    venueId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateDepartmentRequest"];
+                };
+            };
+            responses: {
+                /** @description created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["Department"];
+                        };
+                    };
+                };
+                409: components["responses"]["ErrorResponse"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/venues/{venueId}/departments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venueId: string;
+                id: components["parameters"]["IdPath"];
+            };
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    venueId: string;
+                    id: components["parameters"]["IdPath"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["Department"];
+                        };
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    venueId: string;
+                    id: components["parameters"]["IdPath"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateDepartmentRequest"];
+                };
+            };
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["Department"];
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    venueId: string;
+                    id: components["parameters"]["IdPath"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                409: components["responses"]["ErrorResponse"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -603,6 +768,7 @@ export interface paths {
                     venue?: string;
                     currentVenue?: string;
                     category?: string;
+                    department?: string;
                     status?: components["schemas"]["AssetStatus"];
                     responsible?: string;
                     away?: boolean;
@@ -1973,6 +2139,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/by-department": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Optional venue scope; when omitted, admins get all venues. */
+                    venue?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["DepartmentAssetCountRow"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -2224,6 +2430,18 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        Department: {
+            id: components["schemas"]["ObjectId"];
+            venueId: components["schemas"]["ObjectId"];
+            name: string;
+            code: string;
+            description?: string;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         Asset: {
             id: components["schemas"]["ObjectId"];
             assetTag: string;
@@ -2232,6 +2450,7 @@ export interface components {
             categoryId: components["schemas"]["ObjectId"];
             homeVenueId: components["schemas"]["ObjectId"];
             currentVenueId: components["schemas"]["ObjectId"];
+            departmentId?: components["schemas"]["ObjectId"];
             status: components["schemas"]["AssetStatus"];
             condition: components["schemas"]["AssetCondition"];
             responsibleUserId?: components["schemas"]["ObjectId"];
@@ -2261,6 +2480,7 @@ export interface components {
             homeVenueName?: string;
             currentVenueName?: string;
             categoryName?: string;
+            departmentName?: string;
         };
         PurchaseOrderSupplier: {
             name: string;
@@ -2423,6 +2643,19 @@ export interface components {
             customFields?: components["schemas"]["CategoryCustomField"][];
             isActive?: boolean;
         };
+        CreateDepartmentRequest: {
+            name: string;
+            code: string;
+            description?: string;
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateDepartmentRequest: {
+            name?: string;
+            code?: string;
+            description?: string;
+            isActive?: boolean;
+        };
         CreateUserRequest: {
             name: string;
             /** Format: email */
@@ -2461,6 +2694,7 @@ export interface components {
             categoryId: components["schemas"]["ObjectId"];
             homeVenueId: components["schemas"]["ObjectId"];
             currentVenueId?: components["schemas"]["ObjectId"];
+            departmentId?: components["schemas"]["ObjectId"];
             condition: components["schemas"]["AssetCondition"];
             responsibleUserId?: components["schemas"]["ObjectId"];
             purchaseOrderId?: components["schemas"]["ObjectId"];
@@ -2477,6 +2711,7 @@ export interface components {
             name?: string;
             categoryId?: components["schemas"]["ObjectId"];
             homeVenueId?: components["schemas"]["ObjectId"];
+            departmentId?: components["schemas"]["ObjectId"];
             condition?: components["schemas"]["AssetCondition"];
             serialNumber?: string;
             specs?: {
@@ -2575,6 +2810,8 @@ export interface components {
         ReceivePurchaseOrderRequest: {
             /** @description Home venue for every asset generated by this receive. */
             venueId: components["schemas"]["ObjectId"];
+            /** @description Optional home department for every asset generated by this receive. Must belong to venueId. */
+            departmentId?: components["schemas"]["ObjectId"];
         };
         ReceivePurchaseOrderResponse: {
             purchaseOrder: components["schemas"]["PurchaseOrder"];
@@ -2618,6 +2855,12 @@ export interface components {
             byStatus?: {
                 [key: string]: number;
             };
+            byDepartment?: components["schemas"]["DepartmentAssetCountRow"][];
+        };
+        DepartmentAssetCountRow: {
+            departmentId: components["schemas"]["ObjectId"];
+            departmentName: string;
+            count: number;
         };
         AssetsByResponsibleRow: {
             userId: components["schemas"]["ObjectId"];
