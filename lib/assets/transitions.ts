@@ -46,6 +46,7 @@ const assign: AssetAction = {
   icon: UserPlus,
   type: "assign",
   tone: "secondary",
+  overflow: true,
 };
 const sendToRepair: AssetAction = {
   id: "repair",
