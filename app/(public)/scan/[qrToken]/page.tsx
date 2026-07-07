@@ -114,7 +114,19 @@ function PublicAssetCard({
         </div>
 
         <dl className="divide-y divide-border border-t border-border">
-          <Row label="Home venue" value={data.homeVenueName ?? "—"} />
+          <Row
+            label="Home venue"
+            value={
+              <span className="inline-flex flex-col items-end">
+                <span>{data.homeVenueName ?? "—"}</span>
+                {data.departmentName && (
+                  <span className="text-xs font-normal text-text-tertiary">
+                    {data.departmentName}
+                  </span>
+                )}
+              </span>
+            }
+          />
           <Row
             label="Current location"
             value={
