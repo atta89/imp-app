@@ -1390,6 +1390,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload a file, returns an unlinked attachment ID. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        file: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Upload accepted. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AttachmentUploadResponse"];
+                        };
+                    };
+                };
+                400: components["responses"]["ErrorResponse"];
+                401: components["responses"]["ErrorResponse"];
+                /** @description Payload too large. */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream an attachment. Requires legitimate access to at least one linked asset. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["schemas"]["ObjectId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description File bytes. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": string;
+                    };
+                };
+                401: components["responses"]["ErrorResponse"];
+                403: components["responses"]["ErrorResponse"];
+                404: components["responses"]["ErrorResponse"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/scan/{qrToken}": {
         parameters: {
             query?: never;
@@ -2397,6 +2494,54 @@ export interface components {
         ErrorEnvelope: {
             error: components["schemas"]["ErrorPayload"];
         };
+        /** @description Internal attachment record (not returned in full to any API caller). */
+        Attachment: {
+            id: components["schemas"]["ObjectId"];
+            filename: string;
+            contentType: string;
+            /** Format: int64 */
+            size: number;
+            storageKey?: string;
+            uploadedBy: components["schemas"]["ObjectId"];
+            linked: boolean;
+            assetIds?: components["schemas"]["ObjectId"][];
+            movementIds?: components["schemas"]["ObjectId"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            linkedAt?: string;
+        };
+        /** @description Public attachment metadata embedded in history responses. */
+        AttachmentMeta: {
+            id: components["schemas"]["ObjectId"];
+            filename: string;
+            contentType: string;
+            /** Format: int64 */
+            size: number;
+        };
+        AttachmentUploadResponse: {
+            attachmentId: components["schemas"]["ObjectId"];
+            filename: string;
+            contentType: string;
+            /** Format: int64 */
+            size: number;
+        };
+        AttachmentValidationError: {
+            attachmentId: components["schemas"]["ObjectId"];
+            ok: boolean;
+            /** @enum {string} */
+            error?: "not_found" | "not_owner" | "already_linked";
+        };
+        /**
+         * @description Returned as the 400 body when action-time attachment validation fails.
+         *     The top-level 'attachments' array is only present for Phase-B failures
+         *     (per-attachment checks). Phase-A gate failures (too_many, duplicate_id)
+         *     return only the 'error' payload.
+         */
+        AttachmentValidationResponse: {
+            error: components["schemas"]["ErrorPayload"];
+            attachments?: components["schemas"]["AttachmentValidationError"][];
+        };
         /** @enum {string} */
         Role: "admin" | "venue_manager" | "staff";
         /** @enum {string} */
@@ -2568,6 +2713,9 @@ export interface components {
             toUserId?: components["schemas"]["ObjectId"];
             reason?: string;
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
+            /** @description Populated only in history responses via server-side enrichment; never persisted. */
+            attachments?: components["schemas"]["AttachmentMeta"][];
             /** Format: date-time */
             expectedReturnDate?: string;
             performedBy: components["schemas"]["ObjectId"];
@@ -2772,18 +2920,22 @@ export interface components {
              */
             expectedReturnDate?: string;
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         StatusChangeRequest: {
             status: components["schemas"]["AssetStatus"];
             reason?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         ConditionUpdate: {
             condition: components["schemas"]["AssetCondition"];
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         AssignCustodyRequest: {
             responsibleUserId: components["schemas"]["ObjectId"];
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkQrRequest: {
             assetIds: components["schemas"]["ObjectId"][];
@@ -2797,16 +2949,19 @@ export interface components {
              */
             expectedReturnDate?: string;
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkStatusRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             status: components["schemas"]["AssetStatus"];
             reason?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkAssignRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             responsibleUserId: components["schemas"]["ObjectId"];
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkActionResult: {
             assetId: components["schemas"]["ObjectId"];
@@ -2832,6 +2987,7 @@ export interface components {
             assetIds: components["schemas"]["ObjectId"][];
             condition: components["schemas"]["AssetCondition"];
             notes?: string;
+            attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkConditionSkipped: {
             id: components["schemas"]["ObjectId"];

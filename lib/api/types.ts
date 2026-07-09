@@ -72,3 +72,8 @@ export type TransferAssetRequest = components["schemas"]["TransferAssetRequest"]
 export type StatusChangeRequest = components["schemas"]["StatusChangeRequest"];
 export type AssignCustodyRequest = components["schemas"]["AssignCustodyRequest"];
 export type ConditionUpdate = components["schemas"]["ConditionUpdate"];
+
+// Attachments
+export type AttachmentMeta = components["schemas"]["AttachmentMeta"];
+export type AttachmentUploadResponse =
+  components["schemas"]["AttachmentUploadResponse"];
