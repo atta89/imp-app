@@ -12,6 +12,7 @@ import { queryKeys, type AssetFilters } from "@/lib/api/query-keys";
 import type { components } from "@/lib/api/schema";
 import type {
   AssignCustodyRequest,
+  AttachmentUploadResponse,
   ConditionUpdate,
   StatusChangeRequest,
   TransferAssetRequest,
@@ -673,6 +674,26 @@ export function useCreateRepair(assetId: string) {
     onSuccess: () => {
       invalidate();
       qc.invalidateQueries({ queryKey: queryKeys.repairs.all });
+    },
+  });
+}
+
+// ── Attachments ──────────────────────────────────────────────────────────────
+
+export function useUploadAttachment() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch("/attachments", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => undefined);
+        throw toApiError(json, res.status);
+      }
+      return (await res.json()) as AttachmentUploadResponse;
     },
   });
 }

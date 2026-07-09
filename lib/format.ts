@@ -20,3 +20,13 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   if (days < 7) return `${days}d ago`;
   return formatDate(iso);
 }
+
+/** Format bytes as human-readable size: "1.5 MB", "2.3 KB", etc. */
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  if (i >= sizes.length) return `${(bytes / Math.pow(k, sizes.length - 1)).toFixed(1)} ${sizes[sizes.length - 1]}`;
+  return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
+}
