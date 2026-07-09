@@ -302,11 +302,81 @@ function fauxQrSvg(seed) {
 
 const findAsset = (id) => ASSETS.find((a) => a.id === id);
 
+// ── Attachments (dev mock) ────────────────────────────────────────────────────
+// In-memory store: id -> { id, filename, contentType, size, bytes, linked }.
+let atSeq = 0;
+const ATTACHMENTS = new Map();
+const attachMeta = (a) => ({ id: a.id, filename: a.filename, contentType: a.contentType, size: a.size });
+
+// Read the raw request body (for multipart uploads we must not JSON-parse it).
+function readRaw(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+}
+
+// Minimal multipart/form-data parser: pulls out the single `file` part.
+function parseMultipartFile(buf, contentType) {
+  const m = /boundary=(.+)$/.exec(contentType || "");
+  if (!m) return null;
+  const boundary = `--${m[1].trim()}`;
+  // latin1 keeps binary bytes intact through string slicing.
+  const parts = buf.toString("latin1").split(boundary);
+  for (const part of parts) {
+    if (!/name="file"/.test(part)) continue;
+    const fn = /filename="([^"]*)"/.exec(part);
+    const ct = /Content-Type:\s*([^\r\n]+)/i.exec(part);
+    const headerEnd = part.indexOf("\r\n\r\n");
+    if (headerEnd === -1) continue;
+    let bodyStr = part.slice(headerEnd + 4);
+    bodyStr = bodyStr.replace(/\r\n$/, ""); // trailing CRLF before boundary
+    const bytes = Buffer.from(bodyStr, "latin1");
+    return {
+      filename: fn ? fn[1] : "file",
+      contentType: ct ? ct[1].trim() : "application/octet-stream",
+      bytes,
+    };
+  }
+  return null;
+}
+
+// Validate + link a set of attachmentIds. Returns { attachments: meta[] } on
+// success, or { error: entry[] } (the top-level Phase-B array) on failure.
+function linkAttachments(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return { attachments: [] };
+  const problems = [];
+  for (const id of ids) {
+    const a = ATTACHMENTS.get(id);
+    if (!a) problems.push({ attachmentId: id, ok: false, error: "not_found" });
+    else if (a.linked)
+      problems.push({ attachmentId: id, ok: false, error: "already_linked" });
+  }
+  if (problems.length) {
+    const byId = new Map(problems.map((p) => [p.attachmentId, p]));
+    return { error: ids.map((id) => byId.get(id) || { attachmentId: id, ok: true }) };
+  }
+  const metas = ids.map((id) => attachMeta(ATTACHMENTS.get(id)));
+  for (const id of ids) ATTACHMENTS.get(id).linked = true;
+  return { attachments: metas };
+}
+const attachErr = (res, entries) =>
+  send(res, 400, {
+    error: { kind: "bad_request", message: "attachment validation failed" },
+    attachments: entries,
+  });
+
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {});
   const url = new URL(req.url, "http://localhost:8080");
   const path = url.pathname.replace(/^\/api\/v1/, "");
-  const body = req.method === "POST" || req.method === "PUT" ? await readBody(req) : {};
+  const ctype = req.headers["content-type"] || "";
+  const isMultipart = ctype.startsWith("multipart/form-data");
+  const body =
+    (req.method === "POST" || req.method === "PUT") && !isMultipart
+      ? await readBody(req)
+      : {};
 
   if (path === "/auth/login" || path === "/auth/refresh")
     return send(res, 200, { data: { user: USER, tokens: tokens() } });
@@ -663,11 +733,90 @@ const server = createServer(async (req, res) => {
   const history = path.match(/^\/assets\/([^/]+)\/history$/);
   if (history) return send(res, 200, { data: HISTORY[history[1]] ?? [] });
 
+  // ── Attachment upload / download ────────────────────────────────────────────
+  if (path === "/attachments" && req.method === "POST") {
+    const raw = await readRaw(req);
+    const file = parseMultipartFile(raw, ctype);
+    if (!file) return send(res, 400, { error: { kind: "bad_request", message: "No file part." } });
+    atSeq += 1;
+    const id = `at${atSeq}`;
+    ATTACHMENTS.set(id, { id, ...file, size: file.bytes.length, linked: false });
+    return send(res, 200, {
+      data: { attachmentId: id, filename: file.filename, contentType: file.contentType, size: file.bytes.length },
+    });
+  }
+  const dl = path.match(/^\/attachments\/([^/]+)\/download$/);
+  if (dl && req.method === "GET") {
+    const a = ATTACHMENTS.get(dl[1]);
+    if (!a) return send(res, 404, { error: { kind: "not_found", message: "Attachment not found." } });
+    res.writeHead(200, {
+      "content-type": a.contentType,
+      "content-disposition": `attachment; filename="${a.filename}"`,
+      ...CORS,
+    });
+    return res.end(a.bytes);
+  }
+
+  // ── Bulk actions (must precede the single /assets/:id/* regexes) ─────────────
+  if (path === "/assets/bulk/transfer" && req.method === "POST") {
+    const ids = body.assetIds || [];
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
+    const results = [];
+    let succeeded = 0;
+    for (const id of ids) {
+      const asset = findAsset(id);
+      if (!asset) { results.push({ assetId: id, ok: false, error: "not_found" }); continue; }
+      pushHistory(asset.id, { type: "transfer", fromVenueId: asset.currentVenueId, toVenueId: body.toVenueId, notes: body.notes, attachments: link.attachments.length ? link.attachments : undefined });
+      asset.currentVenueId = body.toVenueId;
+      asset.updatedAt = iso(Date.now());
+      results.push({ assetId: id, ok: true });
+      succeeded += 1;
+    }
+    return send(res, 200, { data: { total: ids.length, succeeded, failed: ids.length - succeeded, results } });
+  }
+  if (path === "/assets/bulk/status" && req.method === "POST") {
+    const ids = body.assetIds || [];
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
+    const results = [];
+    let succeeded = 0;
+    for (const id of ids) {
+      const asset = findAsset(id);
+      if (!asset) { results.push({ assetId: id, ok: false, error: "not_found" }); continue; }
+      pushHistory(asset.id, { type: "status_change", fromStatus: asset.status, toStatus: body.status, reason: body.reason, attachments: link.attachments.length ? link.attachments : undefined });
+      asset.status = body.status;
+      asset.updatedAt = iso(Date.now());
+      results.push({ assetId: id, ok: true });
+      succeeded += 1;
+    }
+    return send(res, 200, { data: { total: ids.length, succeeded, failed: ids.length - succeeded, results } });
+  }
+  if (path === "/assets/bulk/assign" && req.method === "POST") {
+    const ids = body.assetIds || [];
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
+    const results = [];
+    let updated = 0;
+    for (const id of ids) {
+      const asset = findAsset(id);
+      if (!asset) { results.push({ assetId: id, ok: false, error: "not_found" }); continue; }
+      pushHistory(asset.id, { type: "custody_change", fromUserId: asset.responsibleUserId, toUserId: body.responsibleUserId, notes: body.notes, attachments: link.attachments.length ? link.attachments : undefined });
+      asset.responsibleUserId = body.responsibleUserId;
+      asset.updatedAt = iso(Date.now());
+      results.push({ assetId: id, ok: true });
+      updated += 1;
+    }
+    return send(res, 200, { data: { total: ids.length, updated, skippedNoOp: 0, results } });
+  }
+
   const transfer = path.match(/^\/assets\/([^/]+)\/transfer$/);
   if (transfer && req.method === "POST") {
     const asset = findAsset(transfer[1]);
     if (!asset) return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
-    pushHistory(asset.id, { type: "transfer", fromVenueId: asset.currentVenueId, toVenueId: body.toVenueId, notes: body.notes });
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
+    pushHistory(asset.id, { type: "transfer", fromVenueId: asset.currentVenueId, toVenueId: body.toVenueId, notes: body.notes, attachments: link.attachments.length ? link.attachments : undefined });
     asset.currentVenueId = body.toVenueId;
     asset.expectedReturnDate = body.expectedReturnDate || undefined;
     asset.updatedAt = iso(Date.now());
@@ -678,7 +827,9 @@ const server = createServer(async (req, res) => {
   if (status && req.method === "POST") {
     const asset = findAsset(status[1]);
     if (!asset) return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
-    pushHistory(asset.id, { type: "status_change", fromStatus: asset.status, toStatus: body.status, reason: body.reason });
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
+    pushHistory(asset.id, { type: "status_change", fromStatus: asset.status, toStatus: body.status, reason: body.reason, attachments: link.attachments.length ? link.attachments : undefined });
     asset.status = body.status;
     asset.updatedAt = iso(Date.now());
     return send(res, 200, { data: asset });
@@ -688,7 +839,9 @@ const server = createServer(async (req, res) => {
   if (assign && req.method === "POST") {
     const asset = findAsset(assign[1]);
     if (!asset) return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
-    pushHistory(asset.id, { type: "custody_change", fromUserId: asset.responsibleUserId, toUserId: body.responsibleUserId, notes: body.notes });
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
+    pushHistory(asset.id, { type: "custody_change", fromUserId: asset.responsibleUserId, toUserId: body.responsibleUserId, notes: body.notes, attachments: link.attachments.length ? link.attachments : undefined });
     asset.responsibleUserId = body.responsibleUserId;
     asset.updatedAt = iso(Date.now());
     return send(res, 200, { data: asset });
@@ -699,6 +852,8 @@ const server = createServer(async (req, res) => {
       return send(res, 400, { error: { kind: "validation", fields: { assetIds: "Select at least one asset." } } });
     if (!["new", "good", "fair", "poor"].includes(body.condition))
       return send(res, 400, { error: { kind: "validation", fields: { condition: "Invalid condition." } } });
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
     let updated = 0;
     const skipped = [];
     for (const id of body.assetIds) {
@@ -712,7 +867,7 @@ const server = createServer(async (req, res) => {
         skipped.push({ id, reason: "unchanged" });
         continue;
       }
-      pushHistory(asset.id, { type: "condition_change", fromCondition: asset.condition, toCondition: body.condition, notes: body.notes });
+      pushHistory(asset.id, { type: "condition_change", fromCondition: asset.condition, toCondition: body.condition, notes: body.notes, attachments: link.attachments.length ? link.attachments : undefined });
       asset.condition = body.condition;
       asset.updatedAt = iso(Date.now());
       updated += 1;
@@ -726,8 +881,10 @@ const server = createServer(async (req, res) => {
     if (!asset) return send(res, 404, { error: { kind: "not_found", message: "Asset not found." } });
     if (!["new", "good", "fair", "poor"].includes(body.condition))
       return send(res, 400, { error: { kind: "validation", fields: { condition: "Invalid condition." } } });
+    const link = linkAttachments(body.attachmentIds);
+    if (link.error) return attachErr(res, link.error);
     if (body.condition !== asset.condition) {
-      pushHistory(asset.id, { type: "condition_change", fromCondition: asset.condition, toCondition: body.condition, notes: body.notes });
+      pushHistory(asset.id, { type: "condition_change", fromCondition: asset.condition, toCondition: body.condition, notes: body.notes, attachments: link.attachments.length ? link.attachments : undefined });
       asset.condition = body.condition;
       asset.updatedAt = iso(Date.now());
     }
