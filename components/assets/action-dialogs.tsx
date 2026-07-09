@@ -71,7 +71,11 @@ function useResetOnOpen(open: boolean, reset: () => void) {
 
 // ── Change status ─────────────────────────────────────────────────────────────
 
-const statusSchema = z.object({ reason: z.string().optional() });
+const statusSchema = z.object({
+  reason: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
+});
+type StatusValues = z.infer<typeof statusSchema>;
 
 export function ChangeStatusDialog({
   assetId,
@@ -87,17 +91,43 @@ export function ChangeStatusDialog({
   title: string;
 }) {
   const mutation = useChangeAssetStatus(assetId);
-  const { register, handleSubmit, reset, setError } = useForm<{ reason?: string }>(
-    { resolver: zodResolver(statusSchema), defaultValues: { reason: "" } },
-  );
-  useResetOnOpen(open, reset);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    setValue,
+    formState: { errors },
+  } = useForm<StatusValues>({
+    resolver: zodResolver(statusSchema),
+    defaultValues: { reason: "", attachmentIds: [] },
+  });
+  useResetOnOpen(open, () => {
+    reset();
+    setAttachErrors({});
+  });
 
-  async function onSubmit(values: { reason?: string }) {
+  async function onSubmit(values: StatusValues) {
+    setAttachErrors({});
     try {
-      await mutation.mutateAsync({ status: targetStatus, reason: values.reason });
+      await mutation.mutateAsync({
+        status: targetStatus,
+        reason: values.reason,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
+      });
       toast.success(`${title} — done.`);
       onOpenChange(false);
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       applyError(e, setError as never, ["reason", "status"]);
     }
   }
@@ -117,6 +147,19 @@ export function ChangeStatusDialog({
               id="reason"
               placeholder="e.g. deployed for the Q3 event"
               {...register("reason")}
+            />
+          </FormRow>
+          <FormRow
+            label="Attachments"
+            helper="Up to 5 files · JPEG, PNG, WebP or PDF · 10 MB each"
+            error={errors.attachmentIds?.message}
+          >
+            <AttachmentPicker
+              onChange={(ids) =>
+                setValue("attachmentIds", ids, { shouldValidate: true })
+              }
+              serverErrors={attachErrors}
+              disabled={mutation.isPending}
             />
           </FormRow>
           <DialogFooter>
@@ -288,6 +331,7 @@ export function TransferDialog({
 const assignSchema = z.object({
   responsibleUserId: z.string().min(1, "Choose a responsible person"),
   notes: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type AssignValues = z.infer<typeof assignSchema>;
 
@@ -303,27 +347,43 @@ export function AssignDialog({
   users: User[];
 }) {
   const mutation = useAssignCustody(assetId);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<AssignValues>({
     resolver: zodResolver(assignSchema),
-    defaultValues: { responsibleUserId: "", notes: "" },
+    defaultValues: { responsibleUserId: "", notes: "", attachmentIds: [] },
   });
-  useResetOnOpen(open, reset);
+  useResetOnOpen(open, () => {
+    reset();
+    setAttachErrors({});
+  });
 
   async function onSubmit(values: AssignValues) {
+    setAttachErrors({});
     try {
       await mutation.mutateAsync({
         responsibleUserId: values.responsibleUserId,
         notes: values.notes || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       toast.success("Custody reassigned.");
       onOpenChange(false);
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       applyError(e, setError as never, ["responsibleUserId", "notes"]);
     }
   }
@@ -362,6 +422,19 @@ export function AssignDialog({
               id="assign-notes"
               placeholder="Optional"
               {...register("notes")}
+            />
+          </FormRow>
+          <FormRow
+            label="Attachments"
+            helper="Up to 5 files · JPEG, PNG, WebP or PDF · 10 MB each"
+            error={errors.attachmentIds?.message}
+          >
+            <AttachmentPicker
+              onChange={(ids) =>
+                setValue("attachmentIds", ids, { shouldValidate: true })
+              }
+              serverErrors={attachErrors}
+              disabled={mutation.isPending}
             />
           </FormRow>
           <DialogFooter>
@@ -417,6 +490,7 @@ const CONDITIONS: {
 const conditionSchema = z.object({
   condition: z.enum(["new", "good", "fair", "poor"]),
   notes: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type ConditionValues = z.infer<typeof conditionSchema>;
 
@@ -432,6 +506,9 @@ export function UpdateConditionDialog({
   currentCondition: AssetCondition;
 }) {
   const mutation = useUpdateAssetCondition(assetId);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     handleSubmit,
     register,
@@ -446,21 +523,33 @@ export function UpdateConditionDialog({
   });
   // Reset with the latest current condition each time the dialog opens.
   React.useEffect(() => {
-    if (open) reset({ condition: currentCondition, notes: "" });
+    if (open) {
+      reset({ condition: currentCondition, notes: "", attachmentIds: [] });
+      setAttachErrors({});
+    }
   }, [open, currentCondition, reset]);
 
   const selected = watch("condition");
   const unchanged = selected === currentCondition;
 
   async function onSubmit(values: ConditionValues) {
+    setAttachErrors({});
     try {
       await mutation.mutateAsync({
         condition: values.condition,
         notes: values.notes || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       toast.success("Condition updated.");
       onOpenChange(false);
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       applyError(e, setError as never, ["condition", "notes"]);
     }
   }
@@ -528,6 +617,19 @@ export function UpdateConditionDialog({
               id="condition-notes"
               placeholder="e.g. scratched casing after last event"
               {...register("notes")}
+            />
+          </FormRow>
+          <FormRow
+            label="Attachments"
+            helper="Up to 5 files · JPEG, PNG, WebP or PDF · 10 MB each"
+            error={errors.attachmentIds?.message}
+          >
+            <AttachmentPicker
+              onChange={(ids) =>
+                setValue("attachmentIds", ids, { shouldValidate: true })
+              }
+              serverErrors={attachErrors}
+              disabled={mutation.isPending}
             />
           </FormRow>
           <DialogFooter>
