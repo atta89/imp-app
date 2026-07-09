@@ -5,13 +5,18 @@ import {
   Wrench,
   CircleCheck,
   ClipboardCheck,
+  FileText,
+  Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { downloadFile } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
-import { formatDate, formatRelative } from "@/lib/format";
+import { formatBytes, formatDate, formatRelative } from "@/lib/format";
 import { CONDITION_LABEL } from "@/components/assets/condition-badge";
-import type { Movement, MovementType } from "@/lib/api/types";
+import type { Movement, MovementType, AttachmentMeta } from "@/lib/api/types";
 import type { AssetLookups } from "@/lib/assets/view";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -54,6 +59,39 @@ function describe(m: Movement, lookups: AssetLookups): string {
     case "repair_out":
       return "Returned from repair";
   }
+}
+
+function AttachmentChips({ attachments }: { attachments: AttachmentMeta[] }) {
+  async function download(a: AttachmentMeta) {
+    try {
+      await downloadFile(`/attachments/${a.id}/download`, a.filename);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {attachments.map((a) => {
+        const Icon = a.contentType.startsWith("image/") ? ImageIcon : FileText;
+        return (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => download(a)}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs transition-colors hover:border-brand-300 hover:bg-gray-25 dark:hover:bg-white/[0.02]"
+          >
+            <Icon className="size-3.5 shrink-0 text-text-tertiary" />
+            <span className="max-w-[12rem] truncate font-medium text-foreground">
+              {a.filename}
+            </span>
+            <span className="shrink-0 text-text-tertiary tabular-nums">
+              {formatBytes(a.size)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function HistoryTimeline({
@@ -101,6 +139,9 @@ export function HistoryTimeline({
                 </span>
                 {actor ? ` · by ${actor}` : ""}
               </p>
+              {m.attachments && m.attachments.length > 0 && (
+                <AttachmentChips attachments={m.attachments} />
+              )}
             </div>
           </li>
         );
