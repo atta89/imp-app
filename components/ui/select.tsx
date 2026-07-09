@@ -9,7 +9,11 @@ import { cn } from "@/lib/utils";
  */
 function Select({ className, children, ...props }: React.ComponentProps<"select">) {
   return (
-    <div className="relative inline-flex">
+    // Width utilities (e.g. w-full, w-28) go on the wrapper — it's what sizes
+    // the control on screen. The inner <select> is always w-full of the wrapper,
+    // so `<Select className="w-full">` fills its row instead of shrinking to the
+    // widest option.
+    <div className={cn("relative inline-flex", className)}>
       <select
         data-slot="select"
         className={cn(
@@ -17,7 +21,6 @@ function Select({ className, children, ...props }: React.ComponentProps<"select"
           "outline-none focus-visible:border-brand-300 focus-visible:ring-4 focus-visible:ring-brand-100",
           "dark:focus-visible:border-brand-400 dark:focus-visible:ring-brand-400/30",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          className,
         )}
         {...props}
       >
