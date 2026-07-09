@@ -141,7 +141,7 @@ function BulkFailureReport({
               </span>
               <Badge color="gray">{rows.length}</Badge>
             </div>
-            <p className="mt-1.5 break-words text-xs text-text-secondary tabular-nums">
+            <p className="mt-1.5 wrap-break-word text-xs text-text-secondary tabular-nums">
               {rows.map((r) => resolveTag(r.assetId)).join(", ")}
             </p>
           </li>
@@ -792,7 +792,7 @@ function BulkConditionSummary({
               </span>
               <Badge color="gray">{rows.length}</Badge>
             </div>
-            <p className="mt-1.5 break-words text-xs text-text-secondary tabular-nums">
+            <p className="mt-1.5 wrap-break-word text-xs text-text-secondary tabular-nums">
               {rows.map((r) => resolveTag(r.id)).join(", ")}
             </p>
           </li>

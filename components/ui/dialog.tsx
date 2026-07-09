@@ -30,7 +30,7 @@ function DialogContent({
           // [&>*]:min-w-0 lets grid children shrink to the dialog width instead of
           // being forced wider by long unbreakable content (e.g. long filenames),
           // so descendant `truncate` can take effect.
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-5 rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-lg [&>*]:min-w-0",
+          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-5 rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-lg *:min-w-0",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           "motion-reduce:animate-none",
           className,

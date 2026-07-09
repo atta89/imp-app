@@ -138,7 +138,7 @@ export function AttachmentPicker({
                     <Icon className="size-4" />
                   )}
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 max-w-2xs">
                   <p className="truncate text-sm font-medium text-foreground">
                     {item.name}
                   </p>
