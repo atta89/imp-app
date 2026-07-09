@@ -60,9 +60,13 @@ function applyError(
 }
 
 function useResetOnOpen(open: boolean, reset: () => void) {
+  // Fire only when `open` toggles. Callers pass an inline arrow (new identity
+  // each render); depending on it would re-run every render and, since the
+  // callback calls form.reset(), loop infinitely. Mirrors the bulk dialogs' helper.
   React.useEffect(() => {
     if (open) reset();
-  }, [open, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 }
 
 // ── Change status ─────────────────────────────────────────────────────────────
