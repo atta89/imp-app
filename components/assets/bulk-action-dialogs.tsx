@@ -838,6 +838,7 @@ export function BulkUpdateConditionDialog({
     setAttachErrors({});
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selected = watch("condition");
 
   async function onSubmit(values: ConditionValues) {
