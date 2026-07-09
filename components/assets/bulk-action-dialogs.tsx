@@ -14,7 +14,8 @@ import {
   useBulkQrPdf,
   useBulkUpdateCondition,
 } from "@/lib/api/hooks";
-import { errorMessage } from "@/lib/api/errors";
+import { attachmentErrors, errorMessage } from "@/lib/api/errors";
+import type { AttachmentErrorCode } from "@/lib/api/errors";
 import type {
   AssetCondition,
   AssetStatus,
@@ -27,6 +28,7 @@ import type {
 } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import { CONDITION_LABEL } from "@/components/assets/condition-badge";
+import { AttachmentPicker } from "@/components/attachments/attachment-picker";
 import {
   Dialog,
   DialogContent,
@@ -162,6 +164,7 @@ const transferSchema = z.object({
   toVenueId: z.string().min(1, "Choose a destination venue"),
   expectedReturnDate: z.string().optional(),
   notes: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type TransferValues = z.infer<typeof transferSchema>;
 
@@ -182,10 +185,14 @@ export function BulkTransferDialog({
 }) {
   const mutation = useBulkTransfer();
   const [result, setResult] = React.useState<BulkActionResponse | null>(null);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<TransferValues>({
     resolver: zodResolver(transferSchema),
@@ -193,11 +200,13 @@ export function BulkTransferDialog({
   });
 
   useResetOnOpen(open, () => {
-    reset({ toVenueId: "", expectedReturnDate: "", notes: "" });
+    reset({ toVenueId: "", expectedReturnDate: "", notes: "", attachmentIds: [] });
     setResult(null);
+    setAttachErrors({});
   });
 
   async function onSubmit(values: TransferValues) {
+    setAttachErrors({});
     try {
       const res = await mutation.mutateAsync({
         assetIds,
@@ -206,6 +215,9 @@ export function BulkTransferDialog({
           ? new Date(values.expectedReturnDate).toISOString()
           : undefined,
         notes: values.notes || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       if (res.failed === 0) {
         toast.success(
@@ -217,6 +229,11 @@ export function BulkTransferDialog({
         setResult(res);
       }
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       toast.error(errorMessage(e));
     }
   }
@@ -281,6 +298,19 @@ export function BulkTransferDialog({
             <FormRow label="Notes" htmlFor="bulk-notes">
               <Textarea id="bulk-notes" placeholder="Optional" {...register("notes")} />
             </FormRow>
+            <FormRow
+              label="Attachments"
+              helper="Applied to every selected asset · up to 5 files · 10 MB each"
+              error={errors.attachmentIds?.message}
+            >
+              <AttachmentPicker
+                onChange={(ids) =>
+                  setValue("attachmentIds", ids, { shouldValidate: true })
+                }
+                serverErrors={attachErrors}
+                disabled={mutation.isPending}
+              />
+            </FormRow>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="secondary">
@@ -315,6 +345,7 @@ const BULK_ASSIGN_CAP = 500;
 const assignSchema = z.object({
   responsibleUserId: z.string().min(1, "Choose a responsible person"),
   notes: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type AssignValues = z.infer<typeof assignSchema>;
 
@@ -348,11 +379,15 @@ export function BulkAssignDialog({
   const [result, setResult] = React.useState<BulkAssignResponse | null>(null);
   // Server-message banner for global 400s (unknown/inactive user, empty, over-cap).
   const [globalError, setGlobalError] = React.useState<string | null>(null);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<AssignValues>({
     resolver: zodResolver(assignSchema),
@@ -360,12 +395,14 @@ export function BulkAssignDialog({
   });
 
   useResetOnOpen(open, () => {
-    reset({ responsibleUserId: "", notes: "" });
+    reset({ responsibleUserId: "", notes: "", attachmentIds: [] });
     setResult(null);
     setGlobalError(null);
+    setAttachErrors({});
   });
 
   async function onSubmit(values: AssignValues) {
+    setAttachErrors({});
     setGlobalError(null);
     // Client-side guards — fail fast before the network call.
     if (assetIds.length === 0) {
@@ -383,6 +420,9 @@ export function BulkAssignDialog({
         assetIds,
         responsibleUserId: values.responsibleUserId,
         notes: values.notes || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       const hasFailure = res.results.some((r) => !r.ok);
       if (!hasFailure) {
@@ -402,6 +442,11 @@ export function BulkAssignDialog({
         setResult(res);
       }
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       const msg = errorMessage(e);
       setGlobalError(msg);
       toast.error(msg);
@@ -480,6 +525,19 @@ export function BulkAssignDialog({
                 {...register("notes")}
               />
             </FormRow>
+            <FormRow
+              label="Attachments"
+              helper="Applied to every selected asset · up to 5 files · 10 MB each"
+              error={errors.attachmentIds?.message}
+            >
+              <AttachmentPicker
+                onChange={(ids) =>
+                  setValue("attachmentIds", ids, { shouldValidate: true })
+                }
+                serverErrors={attachErrors}
+                disabled={mutation.isPending}
+              />
+            </FormRow>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="secondary">
@@ -502,6 +560,7 @@ export function BulkAssignDialog({
 const statusSchema = z.object({
   status: z.enum(["available", "in_use", "in_repair", "retired", "lost"]),
   reason: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type StatusValues = z.infer<typeof statusSchema>;
 
@@ -520,10 +579,14 @@ export function BulkChangeStatusDialog({
 }) {
   const mutation = useBulkChangeStatus();
   const [result, setResult] = React.useState<BulkActionResponse | null>(null);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<StatusValues>({
     resolver: zodResolver(statusSchema),
@@ -531,16 +594,21 @@ export function BulkChangeStatusDialog({
   });
 
   useResetOnOpen(open, () => {
-    reset({ status: "available", reason: "" });
+    reset({ status: "available", reason: "", attachmentIds: [] });
     setResult(null);
+    setAttachErrors({});
   });
 
   async function onSubmit(values: StatusValues) {
+    setAttachErrors({});
     try {
       const res = await mutation.mutateAsync({
         assetIds,
         status: values.status,
         reason: values.reason || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       if (res.failed === 0) {
         toast.success(
@@ -552,6 +620,11 @@ export function BulkChangeStatusDialog({
         setResult(res);
       }
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       toast.error(errorMessage(e));
     }
   }
@@ -604,6 +677,19 @@ export function BulkChangeStatusDialog({
             </FormRow>
             <FormRow label="Reason" htmlFor="bulk-reason">
               <Textarea id="bulk-reason" placeholder="Optional" {...register("reason")} />
+            </FormRow>
+            <FormRow
+              label="Attachments"
+              helper="Applied to every selected asset · up to 5 files · 10 MB each"
+              error={errors.attachmentIds?.message}
+            >
+              <AttachmentPicker
+                onChange={(ids) =>
+                  setValue("attachmentIds", ids, { shouldValidate: true })
+                }
+                serverErrors={attachErrors}
+                disabled={mutation.isPending}
+              />
             </FormRow>
             <DialogFooter>
               <DialogClose asChild>
@@ -661,6 +747,7 @@ const skipLabel = (code: string | undefined) =>
 const conditionSchema = z.object({
   condition: z.enum(["new", "good", "fair", "poor"]),
   notes: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type ConditionValues = z.infer<typeof conditionSchema>;
 
@@ -730,6 +817,9 @@ export function BulkUpdateConditionDialog({
 }) {
   const mutation = useBulkUpdateCondition();
   const [result, setResult] = React.useState<BulkConditionResult | null>(null);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     register,
     handleSubmit,
@@ -743,18 +833,23 @@ export function BulkUpdateConditionDialog({
   });
 
   useResetOnOpen(open, () => {
-    reset({ condition: "good", notes: "" });
+    reset({ condition: "good", notes: "", attachmentIds: [] });
     setResult(null);
+    setAttachErrors({});
   });
 
   const selected = watch("condition");
 
   async function onSubmit(values: ConditionValues) {
+    setAttachErrors({});
     try {
       const res = await mutation.mutateAsync({
         assetIds,
         condition: values.condition,
         notes: values.notes || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       // Fully successful: quick confirmation, close, clear selection.
       if (res.skipped.length === 0) {
@@ -780,6 +875,11 @@ export function BulkUpdateConditionDialog({
       }
       setResult(res);
     } catch (e) {
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
       toast.error(errorMessage(e));
     }
   }
@@ -867,6 +967,19 @@ export function BulkUpdateConditionDialog({
                 id="bulk-condition-notes"
                 placeholder="e.g. quarterly inventory check"
                 {...register("notes")}
+              />
+            </FormRow>
+            <FormRow
+              label="Attachments"
+              helper="Applied to every affected asset · up to 5 files · 10 MB each"
+              error={errors.attachmentIds?.message}
+            >
+              <AttachmentPicker
+                onChange={(ids) =>
+                  setValue("attachmentIds", ids, { shouldValidate: true })
+                }
+                serverErrors={attachErrors}
+                disabled={mutation.isPending}
               />
             </FormRow>
             <DialogFooter>
