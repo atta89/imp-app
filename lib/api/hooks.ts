@@ -682,18 +682,13 @@ export function useCreateRepair(assetId: string) {
 
 export function useUploadAttachment() {
   return useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await apiFetch("/attachments", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => undefined);
-        throw toApiError(json, res.status);
-      }
-      return (await res.json()) as AttachmentUploadResponse;
+    mutationFn: async (file: File): Promise<AttachmentUploadResponse> => {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await apiFetch("/attachments", { method: "POST", body: form });
+      const json = await res.json().catch(() => undefined);
+      if (!res.ok) throw toApiError(json, res.status);
+      return (json as { data: AttachmentUploadResponse }).data;
     },
   });
 }
