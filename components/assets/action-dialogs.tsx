@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, attachmentErrors } from "@/lib/api/errors";
+import type { AttachmentErrorCode } from "@/lib/api/errors";
 import {
   useAssignCustody,
   useChangeAssetStatus,
@@ -35,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FormRow } from "@/components/layout/form";
+import { AttachmentPicker } from "@/components/attachments/attachment-picker";
 
 /** Map an ApiError's field errors onto the form; toast anything else. Returns handled. */
 function applyError(
@@ -135,6 +137,7 @@ const transferSchema = z.object({
   toVenueId: z.string().min(1, "Choose a destination venue"),
   expectedReturnDate: z.string().optional(),
   notes: z.string().optional(),
+  attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type TransferValues = z.infer<typeof transferSchema>;
 
@@ -152,19 +155,32 @@ export function TransferDialog({
   currentVenueId: string;
 }) {
   const mutation = useTransferAsset(assetId);
+  const [attachErrors, setAttachErrors] = React.useState<
+    Record<string, AttachmentErrorCode>
+  >({});
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<TransferValues>({
     resolver: zodResolver(transferSchema),
-    defaultValues: { toVenueId: "", expectedReturnDate: "", notes: "" },
+    defaultValues: {
+      toVenueId: "",
+      expectedReturnDate: "",
+      notes: "",
+      attachmentIds: [],
+    },
   });
-  useResetOnOpen(open, reset);
+  useResetOnOpen(open, () => {
+    reset();
+    setAttachErrors({});
+  });
 
   async function onSubmit(values: TransferValues) {
+    setAttachErrors({});
     try {
       await mutation.mutateAsync({
         toVenueId: values.toVenueId,
@@ -172,11 +188,23 @@ export function TransferDialog({
           ? new Date(values.expectedReturnDate).toISOString()
           : undefined,
         notes: values.notes || undefined,
+        attachmentIds: values.attachmentIds?.length
+          ? values.attachmentIds
+          : undefined,
       });
       toast.success("Asset transferred.");
       onOpenChange(false);
     } catch (e) {
-      applyError(e, setError as never, ["toVenueId", "expectedReturnDate", "notes"]);
+      const attErrs = attachmentErrors(e);
+      if (Object.keys(attErrs).length) {
+        setAttachErrors(attErrs);
+        return;
+      }
+      applyError(e, setError as never, [
+        "toVenueId",
+        "expectedReturnDate",
+        "notes",
+      ]);
     }
   }
 
@@ -221,6 +249,19 @@ export function TransferDialog({
           </FormRow>
           <FormRow label="Notes" htmlFor="notes">
             <Textarea id="notes" placeholder="Optional" {...register("notes")} />
+          </FormRow>
+          <FormRow
+            label="Attachments"
+            helper="Up to 5 files · JPEG, PNG, WebP or PDF · 10 MB each"
+            error={errors.attachmentIds?.message}
+          >
+            <AttachmentPicker
+              onChange={(ids) =>
+                setValue("attachmentIds", ids, { shouldValidate: true })
+              }
+              serverErrors={attachErrors}
+              disabled={mutation.isPending}
+            />
           </FormRow>
           <DialogFooter>
             <DialogClose asChild>
