@@ -1496,7 +1496,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** PUBLIC — resolve a scanned QR code. Custodian contact details masked. Resolves for lost/retired. */
+        /** Resolve a scanned QR code to an asset view. Requires a valid JWT and that the caller is authorized for the asset (admin, venue scope on the asset's home or current venue, or the asset's current custodian). Custodian contact details are shown in full. Resolves for lost/retired. */
         get: {
             parameters: {
                 query?: never;
@@ -1515,10 +1515,12 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            data?: components["schemas"]["PublicAssetView"];
+                            data?: components["schemas"]["ScanAssetView"];
                         };
                     };
                 };
+                401: components["responses"]["ErrorResponse"];
+                403: components["responses"]["ErrorResponse"];
                 404: components["responses"]["ErrorResponse"];
             };
         };
@@ -2580,12 +2582,15 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        /** @description User identity safe to expose on the public scan view (no email/phone). */
-        PublicUserContact: {
+        /** @description Responsible person shown on the authenticated scan view. Every viewer is authenticated AND authorized for the asset, so full contact details (email/phone) are included. */
+        ScanUserContact: {
             id: components["schemas"]["ObjectId"];
             name: string;
             role: components["schemas"]["Role"];
             position: string;
+            /** Format: email */
+            email: string;
+            phone?: string;
         };
         Venue: {
             id: components["schemas"]["ObjectId"];
@@ -2662,9 +2667,10 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        PublicAssetView: {
+        /** @description Read-only asset view returned by the authenticated scan endpoint. Carries no attachment data — attachment metadata is exclusive to GET /assets/{id}/history. */
+        ScanAssetView: {
             asset: components["schemas"]["Asset"];
-            responsiblePerson?: components["schemas"]["PublicUserContact"];
+            responsiblePerson?: components["schemas"]["ScanUserContact"];
             homeVenueName?: string;
             currentVenueName?: string;
             categoryName?: string;

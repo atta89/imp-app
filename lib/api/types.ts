@@ -63,7 +63,7 @@ export type ImportConflictPolicy =
 export type DashboardSummary = components["schemas"]["DashboardSummary"];
 export type Pagination = components["schemas"]["Pagination"];
 export type Meta = components["schemas"]["Meta"];
-export type PublicUserContact = components["schemas"]["PublicUserContact"];
+export type ScanUserContact = components["schemas"]["ScanUserContact"];
 
 // Request DTOs
 export type CreateAssetRequest = components["schemas"]["CreateAssetRequest"];

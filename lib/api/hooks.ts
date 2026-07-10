@@ -71,8 +71,12 @@ export function useAssetQr(id: string) {
   });
 }
 
-/** PUBLIC scan resolution (no auth required); contact details are masked server-side. */
-export function usePublicAsset(qrToken: string) {
+/**
+ * Authenticated scan resolution. The endpoint requires a JWT and authorizes the
+ * caller per-asset (admin, venue scope, or current custodian), so the returned
+ * responsible person carries full, unmasked contact details (email/phone).
+ */
+export function useScanAsset(qrToken: string) {
   return useQuery({
     queryKey: ["scan", qrToken],
     enabled: Boolean(qrToken),

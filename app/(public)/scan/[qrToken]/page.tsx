@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { MapPin, PackageSearch, ArrowRight, Lock } from "lucide-react";
+import { MapPin, PackageSearch, ShieldX, ArrowRight } from "lucide-react";
 
-import { usePublicAsset } from "@/lib/api/hooks";
-import { useAuth } from "@/lib/auth/auth-context";
+import { useScanAsset } from "@/lib/api/hooks";
+import { ApiError } from "@/lib/api/errors";
+import { AuthGate } from "@/components/auth/auth-gate";
 import { Logo } from "@/components/layout/logo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,10 +33,18 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export default function PublicScanPage() {
+export default function ScanPage() {
+  return (
+    <AuthGate>
+      <ScanView />
+    </AuthGate>
+  );
+}
+
+function ScanView() {
   const { qrToken } = useParams<{ qrToken: string }>();
-  const { status: authStatus } = useAuth();
-  const { data, isLoading, isError } = usePublicAsset(qrToken);
+  const { data, isLoading, isError, error } = useScanAsset(qrToken);
+  const status = error instanceof ApiError ? error.status : undefined;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-5 px-4 py-8">
@@ -43,7 +52,7 @@ export default function PublicScanPage() {
         <Logo />
       </div>
 
-      {isLoading ? (
+      {isLoading || status === 401 ? (
         <Card>
           <CardContent className="space-y-4 p-6">
             <Skeleton className="h-6 w-48" />
@@ -55,27 +64,20 @@ export default function PublicScanPage() {
             </div>
           </CardContent>
         </Card>
-      ) : isError || !data ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/6 dark:text-gray-400">
-              <PackageSearch className="size-6" />
-            </span>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">
-                Code not recognized
-              </p>
-              <p className="text-sm text-text-tertiary">
-                This QR code doesn’t match any asset.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <PublicAssetCard
-          data={data}
-          authenticated={authStatus === "authenticated"}
+      ) : status === 403 ? (
+        <ErrorState
+          icon={<ShieldX className="size-6" />}
+          title="You don’t have access to this asset"
+          description="Ask an admin or the asset’s venue owner if you need to view it."
         />
+      ) : isError || !data ? (
+        <ErrorState
+          icon={<PackageSearch className="size-6" />}
+          title="Code not recognized"
+          description="This QR code doesn’t match any asset."
+        />
+      ) : (
+        <ScanAssetCard data={data} />
       )}
 
       <p className="mt-auto text-center text-xs text-text-tertiary">
@@ -85,12 +87,34 @@ export default function PublicScanPage() {
   );
 }
 
-function PublicAssetCard({
-  data,
-  authenticated,
+function ErrorState({
+  icon,
+  title,
+  description,
 }: {
-  data: NonNullable<ReturnType<typeof usePublicAsset>["data"]>;
-  authenticated: boolean;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/6 dark:text-gray-400">
+          {icon}
+        </span>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-sm text-text-tertiary">{description}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ScanAssetCard({
+  data,
+}: {
+  data: NonNullable<ReturnType<typeof useScanAsset>["data"]>;
 }) {
   const asset = data.asset;
   const away = asset.homeVenueId !== asset.currentVenueId;
@@ -148,35 +172,48 @@ function PublicAssetCard({
             <Row
               label="Responsible"
               value={
-                <div className="flex items-center justify-end gap-2.5">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">
-                      {person.name}
-                    </p>
-                    <p className="text-xs text-text-tertiary">{person.position}</p>
+                <div className="flex min-w-0 flex-col items-end gap-2.5">
+                  <div className="flex items-center justify-end gap-2.5">
+                    <div className="min-w-0 text-right">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {person.name}
+                      </p>
+                      <p className="truncate text-xs text-text-tertiary">
+                        {person.position}
+                      </p>
+                    </div>
+                    <Avatar className="size-8 shrink-0 text-xs">
+                      {initials(person.name)}
+                    </Avatar>
                   </div>
-                  <Avatar className="size-8 text-xs">
-                    {initials(person.name)}
-                  </Avatar>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <a
+                      href={`mailto:${person.email}`}
+                      className="max-w-full truncate text-xs font-normal text-primary underline decoration-border underline-offset-2 hover:decoration-current"
+                    >
+                      {person.email}
+                    </a>
+                    {person.phone && (
+                      <a
+                        href={`tel:${person.phone}`}
+                        className="text-xs font-normal text-primary underline decoration-border underline-offset-2 hover:decoration-current"
+                      >
+                        {person.phone}
+                      </a>
+                    )}
+                  </div>
                 </div>
               }
             />
           )}
         </dl>
 
-        {authenticated ? (
-          <Button className="w-full" asChild>
-            <Link href={`/assets/${asset.id}`}>
-              Manage in dashboard
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        ) : (
-          <div className="flex items-center justify-center gap-1.5 text-xs text-text-tertiary">
-            <Lock className="size-3.5" />
-            Read-only public view
-          </div>
-        )}
+        <Button className="w-full" asChild>
+          <Link href={`/assets/${asset.id}`}>
+            Manage in dashboard
+            <ArrowRight className="size-4" />
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );
