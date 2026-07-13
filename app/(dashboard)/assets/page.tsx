@@ -629,6 +629,7 @@ export default function AssetsPage() {
         open={bulkDialog === "print"}
         onOpenChange={(o) => !o && setBulkDialog(null)}
         assetIds={selectedIds}
+        resolveTag={resolveTag}
       />
     </PageContainer>
   );

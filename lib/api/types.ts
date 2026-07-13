@@ -39,6 +39,15 @@ export type BulkActionResponse = components["schemas"]["BulkActionResponse"];
 export type BulkConditionUpdate = components["schemas"]["BulkConditionUpdate"];
 export type BulkConditionResult = components["schemas"]["BulkConditionResult"];
 export type BulkConditionSkipped = components["schemas"]["BulkConditionSkipped"];
+
+// Async bulk-asset jobs (v0.9): enqueue → poll → progress → errors.
+export type BulkJob = components["schemas"]["BulkJob"];
+export type BulkJobType = components["schemas"]["BulkJobType"];
+export type BulkJobStatus = components["schemas"]["BulkJobStatus"];
+export type BulkJobCounts = components["schemas"]["BulkJobCounts"];
+export type BulkJobProgress = components["schemas"]["BulkJobProgress"];
+export type BulkJobRowError = components["schemas"]["BulkJobRowError"];
+export type BulkJobList = components["schemas"]["BulkJobList"];
 export type ReceivePurchaseOrderRequest =
   components["schemas"]["ReceivePurchaseOrderRequest"];
 export type CreateRepairRequest = components["schemas"]["CreateRepairRequest"];

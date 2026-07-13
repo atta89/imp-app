@@ -1188,6 +1188,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Enqueue an async job that renders a combined PDF of QR labels. Validates existence + per-asset RBAC synchronously, then returns 202 + a BulkJob. Poll GET /assets/bulk/jobs/{jobId}; fetch the PDF from GET /assets/bulk/jobs/{jobId}/result once completed. */
         post: {
             parameters: {
                 query?: never;
@@ -1201,15 +1202,18 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description combined PDF of labels */
-                200: {
+                /** @description Job accepted. Poll the returned BulkJob for status; the PDF is served from the /result sub-resource. */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/pdf": string;
+                        "application/json": {
+                            data: components["schemas"]["BulkJob"];
+                        };
                     };
                 };
+                400: components["responses"]["ErrorResponse"];
             };
         };
         delete?: never;
@@ -1227,7 +1231,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Transfer many assets at once. Validates the whole batch up-front; on any row failure no DB change is made and per-row results are returned. */
+        /**
+         * Enqueue an async transfer of many assets.
+         * @description Validates the whole batch synchronously (existence + active, per-asset RBAC, target venue exists/active, attachments) and, on any row failure (unless validOnly=true), returns the pre-async 400 contract with no DB change. On success returns 202 + a BulkJob and executes asynchronously in per-batch transactions. Whole-job atomicity is relaxed to PER-BATCH atomicity: rows invalidated between enqueue and execution become row errors, not a whole-job abort. Every Movement is stamped performedBy = the enqueuing principal and performedAt = batch execution time. On completion, one transfer digest is enqueued per home-venue manager covering the assets that actually moved.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -1241,14 +1248,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description per-row results */
-                200: {
+                /** @description job accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data?: components["schemas"]["BulkActionResponse"];
+                            data: components["schemas"]["BulkJob"];
                         };
                     };
                 };
@@ -1270,7 +1277,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Change status on many assets at once. Same all-or-nothing contract as bulk transfer. */
+        /**
+         * Enqueue an async status change on many assets.
+         * @description Validates existence, per-asset RBAC, §5 transition validity per row and attachments synchronously; on any row failure (unless validOnly=true) returns the pre-async 400 contract with no DB change. On success returns 202 + a BulkJob. The state machine is re-validated inside each batch transaction against the asset's then-current status, so a transition invalidated after enqueue becomes a row error (job ends completed_with_errors). No notifications. Per-batch atomicity applies.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -1284,14 +1294,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description per-row results */
-                200: {
+                /** @description job accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data?: components["schemas"]["BulkActionResponse"];
+                            data: components["schemas"]["BulkJob"];
                         };
                     };
                 };
@@ -1313,7 +1323,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reassign the custodian on many assets at once. Same all-or-nothing contract as bulk transfer: any per-item failure aborts the batch and returns per-row diagnostics. Assets already assigned to the target user are silently skipped as no-ops. Exactly one digest email is enqueued to the new custodian listing all newly assigned assets. */
+        /**
+         * Enqueue an async custody reassignment on many assets.
+         * @description Validates existence, per-asset RBAC and attachments synchronously; an unknown or inactive responsibleUserId is always a whole-request 400 (regardless of validOnly). Assets already assigned to the target user are pre-counted as skipped. On success returns 202 + a BulkJob. Inside each batch transaction the custodian is re-read: still-assigned rows are skipped with NO Movement written. On completion, exactly one custody digest is enqueued to the new custodian listing all newly assigned assets — even across many batches. Per-batch atomicity applies.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -1327,14 +1340,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description batch summary */
-                200: {
+                /** @description job accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data?: components["schemas"]["BulkAssignResponse"];
+                            data: components["schemas"]["BulkJob"];
                         };
                     };
                 };
@@ -1356,7 +1369,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Set condition on many assets at once. BEST-EFFORT: each successful item is its own transaction; unaffected items are reported in skipped[] with a reason (not_found, forbidden, unchanged). */
+        /**
+         * Enqueue an async condition change on many assets (best-effort).
+         * @description Validates the payload + attachments synchronously (enqueue succeeds if the request itself is valid) and returns 202 + a BulkJob. Best-effort by design: per-row no-op / not-found / forbidden outcomes increment skip counters (not errors), preserving the pre-async silent-skip behaviour, now visible in the job counts. No notifications. Per-batch atomicity applies.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -1370,20 +1386,155 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description bulk summary */
-                200: {
+                /** @description job accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data?: components["schemas"]["BulkConditionResult"];
+                            data: components["schemas"]["BulkJob"];
                         };
                     };
                 };
                 400: components["responses"]["ErrorResponse"];
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/bulk/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List bulk-asset jobs (admin only). */
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["BulkJobStatus"];
+                    type?: components["schemas"]["BulkJobType"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description matching jobs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["BulkJobList"];
+                        };
+                    };
+                };
+                401: components["responses"]["ErrorResponse"];
+                403: components["responses"]["ErrorResponse"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/bulk/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["schemas"]["ObjectId"];
+            };
+            cookie?: never;
+        };
+        /** Fetch a bulk-asset job status. RBAC: the requesting principal or an admin. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: components["schemas"]["ObjectId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description job status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["BulkJob"];
+                        };
+                    };
+                };
+                401: components["responses"]["ErrorResponse"];
+                403: components["responses"]["ErrorResponse"];
+                404: components["responses"]["ErrorResponse"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/bulk/jobs/{jobId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["schemas"]["ObjectId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Stream the rendered QR PDF for a completed qr job.
+         * @description RBAC: the requesting principal or an admin. Returns 404 while the job is not yet completed or if the job is not a qr job. After the result retention window (BULK_RESULT_TTL_DAYS) the rendered PDF is deleted and this endpoint returns 410 Gone.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: components["schemas"]["ObjectId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description combined PDF of labels */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/pdf": string;
+                    };
+                };
+                401: components["responses"]["ErrorResponse"];
+                403: components["responses"]["ErrorResponse"];
+                404: components["responses"]["ErrorResponse"];
+                410: components["responses"]["ErrorResponse"];
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2727,6 +2878,8 @@ export interface components {
             performedBy: components["schemas"]["ObjectId"];
             /** Format: date-time */
             performedAt: string;
+            /** @description Provenance stamp for movements written by an async bulk-asset job (mirrors importJobId on assets/POs). Absent for single-asset actions. */
+            bulkJobId?: components["schemas"]["ObjectId"];
         };
         Repair: {
             id: components["schemas"]["ObjectId"];
@@ -2955,18 +3108,24 @@ export interface components {
              */
             expectedReturnDate?: string;
             notes?: string;
+            /** @description If true, enqueue the valid rows and record invalid ones as job row errors instead of failing the whole request. Default false (strict: any invalid row → 400, nothing enqueued). */
+            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkStatusRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             status: components["schemas"]["AssetStatus"];
             reason?: string;
+            /** @description If true, enqueue the valid rows and record invalid ones as job row errors instead of failing the whole request. Default false (strict: any invalid row → 400, nothing enqueued). */
+            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkAssignRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             responsibleUserId: components["schemas"]["ObjectId"];
             notes?: string;
+            /** @description If true, enqueue the valid rows and record invalid ones as job row errors instead of failing the whole request. Default false (strict: any invalid row → 400, nothing enqueued). Note: an unknown/inactive responsibleUserId is always a whole-request 400 regardless of this flag. */
+            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkActionResult: {
@@ -2993,6 +3152,8 @@ export interface components {
             assetIds: components["schemas"]["ObjectId"][];
             condition: components["schemas"]["AssetCondition"];
             notes?: string;
+            /** @description Accepted for symmetry with the other bulk actions. The condition job is best-effort by design: no-op/not-found/forbidden rows are counted as skips, not errors, so this flag has no effect on enqueue outcome. */
+            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkConditionSkipped: {
@@ -3003,6 +3164,54 @@ export interface components {
         BulkConditionResult: {
             updated: number;
             skipped: components["schemas"]["BulkConditionSkipped"][];
+        };
+        /** @enum {string} */
+        BulkJobType: "transfer" | "status" | "assign" | "condition" | "qr";
+        /**
+         * @description queued (awaiting a worker), running (claimed, batches executing), completed (all batches done, zero row errors), completed_with_errors (done, some rows failed/skipped-as-error), failed (zero successes or a fatal infrastructure error).
+         * @enum {string}
+         */
+        BulkJobStatus: "queued" | "running" | "completed" | "completed_with_errors" | "failed";
+        BulkJobCounts: {
+            /** @description Deduped assetIds enqueued. */
+            total: number;
+            succeeded: number;
+            failed: number;
+            /** @description No-op rows (e.g. already-assigned custody, unchanged condition). */
+            skipped: number;
+        };
+        BulkJobProgress: {
+            batchesTotal: number;
+            /** @description Batches whose transaction has committed. Advances only inside committed batch txns, so it is crash-safe. */
+            batchesDone: number;
+        };
+        BulkJobRowError: {
+            assetId: components["schemas"]["ObjectId"];
+            /** @description Per-row reason, e.g. not_found, forbidden, invalid_transition, dest_venue_forbidden. */
+            code: string;
+            message: string;
+        };
+        BulkJob: {
+            id: components["schemas"]["ObjectId"];
+            type: components["schemas"]["BulkJobType"];
+            status: components["schemas"]["BulkJobStatus"];
+            counts: components["schemas"]["BulkJobCounts"];
+            progress: components["schemas"]["BulkJobProgress"];
+            /** @description Row-level errors, capped (see errorsTruncated). */
+            errors: components["schemas"]["BulkJobRowError"][];
+            /** @description True when more row errors occurred than are retained in errors[]. */
+            errorsTruncated: boolean;
+            /** @description The enqueuing principal. Authorization is evaluated once, at enqueue; every Movement is stamped performedBy = this principal. */
+            requestedBy: components["schemas"]["ObjectId"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            completedAt?: string;
+        };
+        BulkJobList: {
+            jobs: components["schemas"]["BulkJob"][];
         };
         CreatePurchaseOrderRequest: {
             poNumber: string;

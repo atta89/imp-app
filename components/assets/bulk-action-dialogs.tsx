@@ -11,9 +11,9 @@ import {
   useBulkAssign,
   useBulkTransfer,
   useBulkChangeStatus,
-  useBulkQrPdf,
+  useBulkQrJob,
   useBulkUpdateCondition,
-} from "@/lib/api/hooks";
+} from "@/lib/api/bulk-hooks";
 import { attachmentErrors, errorMessage } from "@/lib/api/errors";
 import type { AttachmentErrorCode } from "@/lib/api/errors";
 import type {
@@ -22,12 +22,16 @@ import type {
   BulkActionResponse,
   BulkActionResult,
   BulkAssignResponse,
-  BulkConditionResult,
+  BulkJob,
   User,
   Venue,
 } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import { CONDITION_LABEL } from "@/components/assets/condition-badge";
+import {
+  BulkJobProgress,
+  type ResolveTag,
+} from "@/components/assets/bulk-job-progress";
 import { AttachmentPicker } from "@/components/attachments/attachment-picker";
 import {
   Dialog,
@@ -42,8 +46,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { FormRow } from "@/components/layout/form";
+
+export type { ResolveTag };
 
 const STATUS_LABEL: Record<AssetStatus, string> = {
   available: "Available",
@@ -60,7 +67,8 @@ const STATUSES: AssetStatus[] = [
   "lost",
 ];
 
-// Human labels for the stable per-row error codes the backend returns.
+// Human labels for the stable per-row error codes returned in a strict-validation
+// (200) diagnostics response.
 const ERROR_LABEL: Record<string, string> = {
   not_found: "Asset not found",
   forbidden: "Not permitted for your role/venues",
@@ -70,16 +78,19 @@ const ERROR_LABEL: Record<string, string> = {
   duplicate_id: "Duplicated in the selection",
   dest_venue_not_found: "Destination venue not found",
   dest_not_found: "Destination venue not found",
-  batch_too_large: "Too many assets — the batch limit is 500",
+  batch_too_large: "Too many assets — over the batch limit",
 };
 const errorLabel = (code: string | undefined) =>
   (code && ERROR_LABEL[code]) || code || "Unknown error";
 
 const SYNTHETIC_ID = "000000000000000000000000";
 
-export type ResolveTag = (assetId: string) => string;
+const plural = (n: number) => (n === 1 ? "" : "s");
 
-/** Shared (within this file only) failure report for transfer + status results. */
+/**
+ * Inline per-row diagnostics for a strict (validOnly=false) validation failure.
+ * The endpoint returned 200 and enqueued NOTHING — this is today's shape.
+ */
 function BulkFailureReport({
   result,
   resolveTag,
@@ -119,22 +130,18 @@ function BulkFailureReport({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
-          {result.succeeded > 0
-            ? `${result.failed} of ${result.total} couldn’t be processed`
-            : `None of the ${result.total} could be processed`}
+          {`${result.failed} of ${result.total} row${plural(result.total)} didn’t pass validation`}
         </p>
-        <Badge color="error">{result.failed} failed</Badge>
+        <Badge color="error">{result.failed} invalid</Badge>
       </div>
       <p className="text-xs text-text-tertiary">
-        Nothing was changed — the batch is applied all-or-nothing. Fix the items
-        below and try again.
+        Nothing was queued — with strict validation a single invalid row rejects
+        the whole batch. Fix the items below, or enable “Skip invalid rows” to
+        queue just the valid ones.
       </p>
       <ul className="max-h-64 space-y-3 overflow-y-auto">
         {[...groups.entries()].map(([code, rows]) => (
-          <li
-            key={code}
-            className="rounded-lg border border-border p-3"
-          >
+          <li key={code} className="rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-foreground">
                 {labelOf(code)}
@@ -156,6 +163,73 @@ function useResetOnOpen(open: boolean, fn: () => void) {
     if (open) fn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+}
+
+/** Toggle between strict (reject whole batch) and best-effort (skip invalid). */
+function ValidOnlyField({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <FormRow label="If some rows are invalid">
+      <label className="flex items-start gap-2.5 rounded-lg border border-input px-3.5 py-2.5">
+        <Checkbox
+          checked={checked}
+          onCheckedChange={onChange}
+          disabled={disabled}
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          <span className="block font-medium text-foreground">
+            Skip invalid rows and queue the rest
+          </span>
+          <span className="block text-text-secondary">
+            When off, one invalid row rejects the whole batch — nothing is
+            queued.
+          </span>
+        </span>
+      </label>
+    </FormRow>
+  );
+}
+
+/** Post-enqueue view shared by every dialog: the job-progress panel. */
+function JobView({
+  title,
+  jobId,
+  initialJob,
+  resolveTag,
+  onClose,
+  onRerunQr,
+}: {
+  title: string;
+  jobId: string;
+  initialJob?: BulkJob;
+  resolveTag?: ResolveTag;
+  onClose: () => void;
+  onRerunQr?: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+      </DialogHeader>
+      <BulkJobProgress
+        jobId={jobId}
+        initialJob={initialJob}
+        resolveTag={resolveTag}
+        onRerunQr={onRerunQr}
+      />
+      <DialogFooter>
+        <Button onClick={onClose}>Close</Button>
+      </DialogFooter>
+    </div>
+  );
 }
 
 // ── Bulk transfer ─────────────────────────────────────────────────────────────
@@ -184,7 +258,9 @@ export function BulkTransferDialog({
   onDone: () => void;
 }) {
   const mutation = useBulkTransfer();
-  const [result, setResult] = React.useState<BulkActionResponse | null>(null);
+  const [job, setJob] = React.useState<BulkJob | null>(null);
+  const [diag, setDiag] = React.useState<BulkActionResponse | null>(null);
+  const [validOnly, setValidOnly] = React.useState(false);
   const [attachErrors, setAttachErrors] = React.useState<
     Record<string, AttachmentErrorCode>
   >({});
@@ -201,32 +277,37 @@ export function BulkTransferDialog({
 
   useResetOnOpen(open, () => {
     reset({ toVenueId: "", expectedReturnDate: "", notes: "", attachmentIds: [] });
-    setResult(null);
+    setJob(null);
+    setDiag(null);
+    setValidOnly(false);
     setAttachErrors({});
   });
 
   async function onSubmit(values: TransferValues) {
     setAttachErrors({});
+    setDiag(null);
+    const count = assetIds.length;
     try {
-      const res = await mutation.mutateAsync({
+      const outcome = await mutation.mutateAsync({
         assetIds,
         toVenueId: values.toVenueId,
         expectedReturnDate: values.expectedReturnDate
           ? new Date(values.expectedReturnDate).toISOString()
           : undefined,
         notes: values.notes || undefined,
+        validOnly: validOnly || undefined,
         attachmentIds: values.attachmentIds?.length
           ? values.attachmentIds
           : undefined,
       });
-      if (res.failed === 0) {
-        toast.success(
-          `${res.succeeded} asset${res.succeeded === 1 ? "" : "s"} transferred.`,
-        );
+      if (outcome.kind === "job") {
+        toast.success(`Queued ${count} asset${plural(count)} for transfer.`, {
+          description: "Running in the background — track it here or on the job page.",
+        });
         onDone();
-        onOpenChange(false);
+        setJob(outcome.job);
       } else {
-        setResult(res);
+        setDiag(outcome.diagnostics);
       }
     } catch (e) {
       const attErrs = attachmentErrors(e);
@@ -241,32 +322,35 @@ export function BulkTransferDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {result ? (
+        {job ? (
+          <JobView
+            title="Transfer queued"
+            jobId={job.id}
+            initialJob={job}
+            resolveTag={resolveTag}
+            onClose={() => onOpenChange(false)}
+          />
+        ) : diag ? (
           <div className="space-y-5">
             <DialogHeader>
-              <DialogTitle>Transfer results</DialogTitle>
+              <DialogTitle>Transfer not queued</DialogTitle>
             </DialogHeader>
-            <BulkFailureReport result={result} resolveTag={resolveTag} />
+            <BulkFailureReport result={diag} resolveTag={resolveTag} />
             <DialogFooter>
-              <Button variant="secondary" onClick={() => setResult(null)}>
+              <Button variant="secondary" onClick={() => setDiag(null)}>
                 Back
               </Button>
-              <Button
-                onClick={() => {
-                  onDone();
-                  onOpenChange(false);
-                }}
-              >
-                Clear selection &amp; close
-              </Button>
+              <Button onClick={() => onOpenChange(false)}>Close</Button>
             </DialogFooter>
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <DialogHeader>
-              <DialogTitle>Transfer {assetIds.length} assets</DialogTitle>
+              <DialogTitle>
+                Transfer {assetIds.length} asset{plural(assetIds.length)}
+              </DialogTitle>
               <DialogDescription>
-                Move every selected asset to one venue.
+                Move every selected asset to one venue. Runs as a background job.
               </DialogDescription>
             </DialogHeader>
             <FormRow
@@ -298,6 +382,11 @@ export function BulkTransferDialog({
             <FormRow label="Notes" htmlFor="bulk-notes">
               <Textarea id="bulk-notes" placeholder="Optional" {...register("notes")} />
             </FormRow>
+            <ValidOnlyField
+              checked={validOnly}
+              onChange={setValidOnly}
+              disabled={mutation.isPending}
+            />
             <FormRow
               label="Attachments"
               helper="Applied to every selected asset · up to 5 files · 10 MB each"
@@ -318,7 +407,7 @@ export function BulkTransferDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "Transferring…" : "Transfer"}
+                {mutation.isPending ? "Queuing…" : "Queue transfer"}
               </Button>
             </DialogFooter>
           </form>
@@ -339,8 +428,6 @@ const ASSIGN_ERROR_LABEL: Record<string, string> = {
 };
 const assignErrorLabel = (code: string | undefined) =>
   (code && ASSIGN_ERROR_LABEL[code]) || errorLabel(code);
-
-const BULK_ASSIGN_CAP = 500;
 
 const assignSchema = z.object({
   responsibleUserId: z.string().min(1, "Choose a responsible person"),
@@ -376,7 +463,9 @@ export function BulkAssignDialog({
   onDone: () => void;
 }) {
   const mutation = useBulkAssign();
-  const [result, setResult] = React.useState<BulkAssignResponse | null>(null);
+  const [job, setJob] = React.useState<BulkJob | null>(null);
+  const [diag, setDiag] = React.useState<BulkAssignResponse | null>(null);
+  const [validOnly, setValidOnly] = React.useState(false);
   // Server-message banner for global 400s (unknown/inactive user, empty, over-cap).
   const [globalError, setGlobalError] = React.useState<string | null>(null);
   const [attachErrors, setAttachErrors] = React.useState<
@@ -396,7 +485,9 @@ export function BulkAssignDialog({
 
   useResetOnOpen(open, () => {
     reset({ responsibleUserId: "", notes: "", attachmentIds: [] });
-    setResult(null);
+    setJob(null);
+    setDiag(null);
+    setValidOnly(false);
     setGlobalError(null);
     setAttachErrors({});
   });
@@ -404,42 +495,31 @@ export function BulkAssignDialog({
   async function onSubmit(values: AssignValues) {
     setAttachErrors({});
     setGlobalError(null);
-    // Client-side guards — fail fast before the network call.
+    setDiag(null);
     if (assetIds.length === 0) {
       setError("responsibleUserId", { message: "No assets selected." });
       return;
     }
-    if (assetIds.length > BULK_ASSIGN_CAP) {
-      setGlobalError(
-        `Too many assets — reassign at most ${BULK_ASSIGN_CAP} at a time.`,
-      );
-      return;
-    }
+    const count = assetIds.length;
     try {
-      const res = await mutation.mutateAsync({
+      const outcome = await mutation.mutateAsync({
         assetIds,
         responsibleUserId: values.responsibleUserId,
         notes: values.notes || undefined,
+        validOnly: validOnly || undefined,
         attachmentIds: values.attachmentIds?.length
           ? values.attachmentIds
           : undefined,
       });
-      const hasFailure = res.results.some((r) => !r.ok);
-      if (!hasFailure) {
-        const parts = [
-          `${res.updated} reassigned`,
-          res.skippedNoOp > 0
-            ? `${res.skippedNoOp} already assigned (skipped)`
-            : null,
-        ].filter(Boolean);
-        toast.success(parts.join(", ") + ".", {
+      if (outcome.kind === "job") {
+        toast.success(`Queued ${count} asset${plural(count)} for reassignment.`, {
           description:
-            "One digest email is on its way to the new custodian.",
+            "One digest email is sent to the new custodian once the job completes.",
         });
         onDone();
-        onOpenChange(false);
+        setJob(outcome.job);
       } else {
-        setResult(res);
+        setDiag(outcome.diagnostics);
       }
     } catch (e) {
       const attErrs = attachmentErrors(e);
@@ -456,28 +536,29 @@ export function BulkAssignDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {result ? (
+        {job ? (
+          <JobView
+            title="Reassignment queued"
+            jobId={job.id}
+            initialJob={job}
+            resolveTag={resolveTag}
+            onClose={() => onOpenChange(false)}
+          />
+        ) : diag ? (
           <div className="space-y-5">
             <DialogHeader>
-              <DialogTitle>Reassignment results</DialogTitle>
+              <DialogTitle>Reassignment not queued</DialogTitle>
             </DialogHeader>
             <BulkFailureReport
-              result={toFailureShape(result)}
+              result={toFailureShape(diag)}
               resolveTag={resolveTag}
               errorLabelFor={assignErrorLabel}
             />
             <DialogFooter>
-              <Button variant="secondary" onClick={() => setResult(null)}>
+              <Button variant="secondary" onClick={() => setDiag(null)}>
                 Back
               </Button>
-              <Button
-                onClick={() => {
-                  onDone();
-                  onOpenChange(false);
-                }}
-              >
-                Clear selection &amp; close
-              </Button>
+              <Button onClick={() => onOpenChange(false)}>Close</Button>
             </DialogFooter>
           </div>
         ) : (
@@ -485,12 +566,11 @@ export function BulkAssignDialog({
             <DialogHeader>
               <DialogTitle>
                 Reassign custody — {assetIds.length} asset
-                {assetIds.length === 1 ? "" : "s"}
+                {plural(assetIds.length)}
               </DialogTitle>
               <DialogDescription>
                 Change who is accountable for every selected asset. One digest
-                email is sent to the new custodian summarizing everything they
-                just picked up.
+                email is sent to the new custodian when the job completes.
               </DialogDescription>
             </DialogHeader>
             {globalError ? (
@@ -525,6 +605,11 @@ export function BulkAssignDialog({
                 {...register("notes")}
               />
             </FormRow>
+            <ValidOnlyField
+              checked={validOnly}
+              onChange={setValidOnly}
+              disabled={mutation.isPending}
+            />
             <FormRow
               label="Attachments"
               helper="Applied to every selected asset · up to 5 files · 10 MB each"
@@ -545,7 +630,7 @@ export function BulkAssignDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "Reassigning…" : "Reassign"}
+                {mutation.isPending ? "Queuing…" : "Queue reassignment"}
               </Button>
             </DialogFooter>
           </form>
@@ -578,7 +663,9 @@ export function BulkChangeStatusDialog({
   onDone: () => void;
 }) {
   const mutation = useBulkChangeStatus();
-  const [result, setResult] = React.useState<BulkActionResponse | null>(null);
+  const [job, setJob] = React.useState<BulkJob | null>(null);
+  const [diag, setDiag] = React.useState<BulkActionResponse | null>(null);
+  const [validOnly, setValidOnly] = React.useState(false);
   const [attachErrors, setAttachErrors] = React.useState<
     Record<string, AttachmentErrorCode>
   >({});
@@ -595,29 +682,35 @@ export function BulkChangeStatusDialog({
 
   useResetOnOpen(open, () => {
     reset({ status: "available", reason: "", attachmentIds: [] });
-    setResult(null);
+    setJob(null);
+    setDiag(null);
+    setValidOnly(false);
     setAttachErrors({});
   });
 
   async function onSubmit(values: StatusValues) {
     setAttachErrors({});
+    setDiag(null);
+    const count = assetIds.length;
     try {
-      const res = await mutation.mutateAsync({
+      const outcome = await mutation.mutateAsync({
         assetIds,
         status: values.status,
         reason: values.reason || undefined,
+        validOnly: validOnly || undefined,
         attachmentIds: values.attachmentIds?.length
           ? values.attachmentIds
           : undefined,
       });
-      if (res.failed === 0) {
+      if (outcome.kind === "job") {
         toast.success(
-          `${res.succeeded} asset${res.succeeded === 1 ? "" : "s"} updated.`,
+          `Queued a status change for ${count} asset${plural(count)}.`,
+          { description: "Running in the background — track it here or on the job page." },
         );
         onDone();
-        onOpenChange(false);
+        setJob(outcome.job);
       } else {
-        setResult(res);
+        setDiag(outcome.diagnostics);
       }
     } catch (e) {
       const attErrs = attachmentErrors(e);
@@ -632,33 +725,36 @@ export function BulkChangeStatusDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {result ? (
+        {job ? (
+          <JobView
+            title="Status change queued"
+            jobId={job.id}
+            initialJob={job}
+            resolveTag={resolveTag}
+            onClose={() => onOpenChange(false)}
+          />
+        ) : diag ? (
           <div className="space-y-5">
             <DialogHeader>
-              <DialogTitle>Status change results</DialogTitle>
+              <DialogTitle>Status change not queued</DialogTitle>
             </DialogHeader>
-            <BulkFailureReport result={result} resolveTag={resolveTag} />
+            <BulkFailureReport result={diag} resolveTag={resolveTag} />
             <DialogFooter>
-              <Button variant="secondary" onClick={() => setResult(null)}>
+              <Button variant="secondary" onClick={() => setDiag(null)}>
                 Back
               </Button>
-              <Button
-                onClick={() => {
-                  onDone();
-                  onOpenChange(false);
-                }}
-              >
-                Clear selection &amp; close
-              </Button>
+              <Button onClick={() => onOpenChange(false)}>Close</Button>
             </DialogFooter>
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <DialogHeader>
-              <DialogTitle>Change status — {assetIds.length} assets</DialogTitle>
+              <DialogTitle>
+                Change status — {assetIds.length} asset{plural(assetIds.length)}
+              </DialogTitle>
               <DialogDescription>
                 Each asset is validated individually; illegal transitions are
-                reported back.
+                reported back per row.
               </DialogDescription>
             </DialogHeader>
             <FormRow
@@ -678,6 +774,11 @@ export function BulkChangeStatusDialog({
             <FormRow label="Reason" htmlFor="bulk-reason">
               <Textarea id="bulk-reason" placeholder="Optional" {...register("reason")} />
             </FormRow>
+            <ValidOnlyField
+              checked={validOnly}
+              onChange={setValidOnly}
+              disabled={mutation.isPending}
+            />
             <FormRow
               label="Attachments"
               helper="Applied to every selected asset · up to 5 files · 10 MB each"
@@ -698,7 +799,7 @@ export function BulkChangeStatusDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "Updating…" : "Change status"}
+                {mutation.isPending ? "Queuing…" : "Queue status change"}
               </Button>
             </DialogFooter>
           </form>
@@ -736,71 +837,12 @@ const CONDITIONS: {
   },
 ];
 
-const SKIP_REASON: Record<string, string> = {
-  unchanged: "Already this condition",
-  forbidden: "Not permitted for your role/venues",
-  not_found: "Asset not found",
-};
-const skipLabel = (code: string | undefined) =>
-  (code && SKIP_REASON[code]) || code || "Unknown reason";
-
 const conditionSchema = z.object({
   condition: z.enum(["new", "good", "fair", "poor"]),
   notes: z.string().optional(),
   attachmentIds: z.array(z.string()).max(5, "Up to 5 files").optional(),
 });
 type ConditionValues = z.infer<typeof conditionSchema>;
-
-/** Result view for bulk condition — grouped list of skipped assets. */
-function BulkConditionSummary({
-  result,
-  resolveTag,
-}: {
-  result: BulkConditionResult;
-  resolveTag: ResolveTag;
-}) {
-  const groups = new Map<string, { id: string }[]>();
-  for (const s of result.skipped) {
-    const arr = groups.get(s.reason);
-    if (arr) arr.push({ id: s.id });
-    else groups.set(s.reason, [{ id: s.id }]);
-  }
-  const allSkipped = result.updated === 0;
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">
-          {allSkipped
-            ? "Nothing updated"
-            : `${result.updated} updated · ${result.skipped.length} skipped`}
-        </p>
-        <Badge color={allSkipped ? "warning" : "gray"}>
-          {result.skipped.length} skipped
-        </Badge>
-      </div>
-      <p className="text-xs text-text-tertiary">
-        {allSkipped
-          ? "None of the selected assets needed a change, or you don’t have permission."
-          : "Successfully-updated assets are already reflected in the list."}
-      </p>
-      <ul className="max-h-64 space-y-3 overflow-y-auto">
-        {[...groups.entries()].map(([code, rows]) => (
-          <li key={code} className="rounded-lg border border-border p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {skipLabel(code)}
-              </span>
-              <Badge color="gray">{rows.length}</Badge>
-            </div>
-            <p className="mt-1.5 wrap-break-word text-xs text-text-secondary tabular-nums">
-              {rows.map((r) => resolveTag(r.id)).join(", ")}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 export function BulkUpdateConditionDialog({
   open,
@@ -816,7 +858,7 @@ export function BulkUpdateConditionDialog({
   onDone: () => void;
 }) {
   const mutation = useBulkUpdateCondition();
-  const [result, setResult] = React.useState<BulkConditionResult | null>(null);
+  const [job, setJob] = React.useState<BulkJob | null>(null);
   const [attachErrors, setAttachErrors] = React.useState<
     Record<string, AttachmentErrorCode>
   >({});
@@ -834,7 +876,7 @@ export function BulkUpdateConditionDialog({
 
   useResetOnOpen(open, () => {
     reset({ condition: "good", notes: "", attachmentIds: [] });
-    setResult(null);
+    setJob(null);
     setAttachErrors({});
   });
 
@@ -843,8 +885,9 @@ export function BulkUpdateConditionDialog({
 
   async function onSubmit(values: ConditionValues) {
     setAttachErrors({});
+    const count = assetIds.length;
     try {
-      const res = await mutation.mutateAsync({
+      const createdJob = await mutation.mutateAsync({
         assetIds,
         condition: values.condition,
         notes: values.notes || undefined,
@@ -852,29 +895,14 @@ export function BulkUpdateConditionDialog({
           ? values.attachmentIds
           : undefined,
       });
-      // Fully successful: quick confirmation, close, clear selection.
-      if (res.skipped.length === 0) {
-        toast.success(
-          `${res.updated} asset${res.updated === 1 ? "" : "s"} updated to ${CONDITION_LABEL[values.condition]}.`,
-        );
-        onDone();
-        onOpenChange(false);
-        return;
-      }
-      // Partial or all-skipped: toast summary + inline breakdown so the user
-      // can see which rows were skipped and why.
-      if (res.updated === 0) {
-        toast.warning(
-          `No assets updated — all ${res.skipped.length} skipped.`,
-          { description: describeSkipped(res.skipped) },
-        );
-      } else {
-        toast.success(
-          `${res.updated} updated · ${res.skipped.length} skipped.`,
-          { description: describeSkipped(res.skipped) },
-        );
-      }
-      setResult(res);
+      toast.success(
+        `Queued a condition update for ${count} asset${plural(count)}.`,
+        {
+          description: `Setting ${CONDITION_LABEL[values.condition]} — unchanged rows are skipped.`,
+        },
+      );
+      onDone();
+      setJob(createdJob);
     } catch (e) {
       const attErrs = attachmentErrors(e);
       if (Object.keys(attErrs).length) {
@@ -888,36 +916,25 @@ export function BulkUpdateConditionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {result ? (
-          <div className="space-y-5">
-            <DialogHeader>
-              <DialogTitle>Condition update results</DialogTitle>
-            </DialogHeader>
-            <BulkConditionSummary result={result} resolveTag={resolveTag} />
-            <DialogFooter>
-              <Button variant="secondary" onClick={() => setResult(null)}>
-                Back
-              </Button>
-              <Button
-                onClick={() => {
-                  onDone();
-                  onOpenChange(false);
-                }}
-              >
-                Clear selection &amp; close
-              </Button>
-            </DialogFooter>
-          </div>
+        {job ? (
+          <JobView
+            title="Condition update queued"
+            jobId={job.id}
+            initialJob={job}
+            resolveTag={resolveTag}
+            onClose={() => onOpenChange(false)}
+          />
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <DialogHeader>
               <DialogTitle>
                 Update condition for {assetIds.length} asset
-                {assetIds.length === 1 ? "" : "s"}
+                {plural(assetIds.length)}
               </DialogTitle>
               <DialogDescription>
-                Assets that are already at the selected condition are left
-                alone. The change is logged per-asset.
+                Best-effort by design: assets already at the selected condition
+                (or you can’t access) are skipped, never rejected. The change is
+                logged per-asset.
               </DialogDescription>
             </DialogHeader>
             <FormRow
@@ -990,9 +1007,7 @@ export function BulkUpdateConditionDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending
-                  ? "Updating…"
-                  : `Update ${assetIds.length}`}
+                {mutation.isPending ? "Queuing…" : `Update ${assetIds.length}`}
               </Button>
             </DialogFooter>
           </form>
@@ -1002,43 +1017,32 @@ export function BulkUpdateConditionDialog({
   );
 }
 
-/** Compact skip breakdown for the toast description. */
-function describeSkipped(
-  skipped: BulkConditionResult["skipped"],
-): string {
-  const counts = new Map<string, number>();
-  for (const s of skipped) counts.set(s.reason, (counts.get(s.reason) ?? 0) + 1);
-  return [...counts.entries()]
-    .map(([code, n]) => `${n} ${skipLabel(code).toLowerCase()}`)
-    .join(" · ");
-}
-
-// ── Bulk print labels ─────────────────────────────────────────────────────────
+// ── Bulk print labels (QR) ────────────────────────────────────────────────────
 
 export function BulkPrintLabelsDialog({
   open,
   onOpenChange,
   assetIds,
+  resolveTag,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assetIds: string[];
+  resolveTag?: ResolveTag;
 }) {
-  const mutation = useBulkQrPdf();
+  const mutation = useBulkQrJob();
+  const [job, setJob] = React.useState<BulkJob | null>(null);
 
-  async function handlePrint() {
+  useResetOnOpen(open, () => {
+    setJob(null);
+  });
+
+  async function handleEnqueue() {
+    const count = assetIds.length;
     try {
-      const blob = await mutation.mutateAsync({ assetIds });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "asset-labels.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      toast.success("Labels ready — downloading.");
-      onOpenChange(false);
+      const createdJob = await mutation.mutateAsync({ assetIds });
+      toast.success(`Queued QR labels for ${count} asset${plural(count)}.`);
+      setJob(createdJob);
     } catch (e) {
       toast.error(errorMessage(e));
     }
@@ -1046,24 +1050,38 @@ export function BulkPrintLabelsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Print labels</DialogTitle>
-          <DialogDescription>
-            Generate a printable PDF of QR labels for {assetIds.length} asset
-            {assetIds.length === 1 ? "" : "s"} (18 per A4 page).
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button onClick={handlePrint} disabled={mutation.isPending}>
-            {mutation.isPending ? "Preparing…" : "Download PDF"}
-          </Button>
-        </DialogFooter>
+      <DialogContent className={job ? undefined : "max-w-sm"}>
+        {job ? (
+          <JobView
+            title="Label render queued"
+            jobId={job.id}
+            initialJob={job}
+            resolveTag={resolveTag}
+            onClose={() => onOpenChange(false)}
+            onRerunQr={handleEnqueue}
+          />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Print labels</DialogTitle>
+              <DialogDescription>
+                Render a printable PDF of QR labels for {assetIds.length} asset
+                {plural(assetIds.length)} (18 per A4 page). Runs as a background
+                job; download the PDF when it’s ready.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button onClick={handleEnqueue} disabled={mutation.isPending}>
+                {mutation.isPending ? "Queuing…" : "Generate labels"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

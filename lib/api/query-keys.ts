@@ -21,6 +21,12 @@ export const queryKeys = {
     detail: (id: string) => ["assets", "detail", id] as const,
     history: (id: string) => ["assets", "history", id] as const,
   },
+  bulkJobs: {
+    all: ["bulk-jobs"] as const,
+    detail: (id: string) => ["bulk-jobs", "detail", id] as const,
+    list: (status?: string, type?: string) =>
+      ["bulk-jobs", "list", status ?? "", type ?? ""] as const,
+  },
   venues: {
     all: ["venues"] as const,
   },

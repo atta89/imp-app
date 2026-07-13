@@ -438,82 +438,8 @@ export function useUpdateRepair(id: string) {
 }
 
 // ── Bulk asset actions ───────────────────────────────────────────────────────
-// All three always return 200 with per-row results; a 400 means a batch-level
-// problem (e.g. > 500 assets) and throws a normalized ApiError.
-
-export function useBulkTransfer() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (body: components["schemas"]["BulkTransferRequest"]) => {
-      const env = unwrap(await api.POST("/assets/bulk/transfer", { body }));
-      if (!env.data) throw toApiError(undefined, 500);
-      return env.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.assets.all });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
-    },
-  });
-}
-
-export function useBulkChangeStatus() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (body: components["schemas"]["BulkStatusRequest"]) => {
-      const env = unwrap(await api.POST("/assets/bulk/status", { body }));
-      if (!env.data) throw toApiError(undefined, 500);
-      return env.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.assets.all });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
-    },
-  });
-}
-
-export function useBulkAssign() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (body: components["schemas"]["BulkAssignRequest"]) => {
-      const env = unwrap(await api.POST("/assets/bulk/assign", { body }));
-      if (!env.data) throw toApiError(undefined, 500);
-      return env.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.assets.all });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
-    },
-  });
-}
-
-export function useBulkUpdateCondition() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (
-      body: components["schemas"]["BulkConditionUpdate"],
-    ) => {
-      const env = unwrap(
-        await api.POST("/assets/condition/bulk", { body }),
-      );
-      if (!env.data) throw toApiError(undefined, 500);
-      return env.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.assets.all });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
-    },
-  });
-}
-
-/** Combined PDF of QR labels for the batch. Returns the blob; caller downloads it. */
-export function useBulkQrPdf() {
-  return useMutation({
-    mutationFn: async (body: components["schemas"]["BulkQrRequest"]) =>
-      unwrap(
-        await api.POST("/assets/qr/bulk", { body, parseAs: "blob" }),
-      ) as Blob,
-  });
-}
+// v0.9 made all five bulk endpoints asynchronous (202 + BulkJob). Their hooks
+// now live in lib/api/bulk-hooks.ts alongside the job-polling + QR-result flow.
 
 // ── Departments (venue-scoped) ───────────────────────────────────────────────
 
