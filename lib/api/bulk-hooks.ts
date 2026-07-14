@@ -7,10 +7,12 @@ import { api, apiFetch } from "@/lib/api/client";
 import { toApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
+  AssetIdsResult,
   BulkActionResponse,
   BulkAssignRequest,
   BulkAssignResponse,
   BulkConditionUpdate,
+  BulkIdsRequest,
   BulkJob,
   BulkJobList,
   BulkJobStatus,
@@ -132,6 +134,17 @@ export function useBulkQrJob() {
   });
 }
 
+/**
+ * Enqueue an async asset-id export job. Unlike the mutating bulk endpoints this
+ * only ever 202s (no 200 diagnostics branch), so we unwrap the job directly.
+ */
+export function useBulkIdsJob() {
+  return useMutation({
+    mutationFn: async (body: BulkIdsRequest): Promise<BulkJob> =>
+      unwrapJob(await api.POST("/assets/bulk/ids", { body })),
+  });
+}
+
 /** Poll a single bulk job until it reaches a terminal status. */
 export function useBulkJob(id: string | undefined) {
   return useQuery({
@@ -227,4 +240,22 @@ export async function downloadBulkJobResult(
   link.remove();
   URL.revokeObjectURL(objectUrl);
   return "ok";
+}
+
+/**
+ * Fetch the completed JSON artifact for an `ids` export job. Mirrors
+ * {@link downloadBulkJobResult}'s soft-state handling — 404 (not ready yet) and
+ * 410 (past the retention window) come back as states rather than throwing so
+ * callers can react in the UI; other failures throw a normalized ApiError.
+ */
+export async function fetchBulkJobIdsResult(
+  jobId: string,
+): Promise<AssetIdsResult | { state: "not_ready" | "expired" }> {
+  const res = await apiFetch(`/assets/bulk/jobs/${jobId}/result`);
+  if (res.status === 404) return { state: "not_ready" };
+  if (res.status === 410) return { state: "expired" };
+  if (!res.ok) {
+    throw toApiError(await res.json().catch(() => undefined), res.status);
+  }
+  return (await res.json()) as AssetIdsResult;
 }

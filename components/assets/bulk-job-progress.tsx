@@ -33,6 +33,7 @@ const TYPE_NOUN: Record<BulkJob["type"], string> = {
   assign: "reassignment",
   condition: "condition update",
   qr: "label render",
+  ids: "asset selection",
 };
 
 function CountGrid({ counts }: { counts: BulkJobCounts }) {

@@ -54,6 +54,7 @@ import {
   BulkPrintLabelsDialog,
   BulkUpdateConditionDialog,
 } from "@/components/assets/bulk-action-dialogs";
+import { SelectMatchingBanner } from "@/components/assets/select-matching-banner";
 
 type BulkDialog =
   | "transfer"
@@ -134,6 +135,11 @@ export default function AssetsPage() {
     away: awayOnly || undefined,
   };
 
+  // Same filter values fed to the list, minus pagination — the shape the
+  // "select matching" export expects so its selection matches the list exactly.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { page: _p, limit: _l, ...listFilters } = filters;
+
   const assetsQuery = useAssets(filters);
   const venuesQuery = useVenues();
   const categoriesQuery = useCategories();
@@ -182,6 +188,10 @@ export default function AssetsPage() {
 
   const total = assetsQuery.data?.meta?.pagination?.total ?? 0;
   const loading = assetsQuery.isLoading;
+
+  // Whole-page selection drives the Gmail-style "select all matching" banner.
+  const allPageSelected =
+    rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
 
   function clearFilters() {
     setSearch("");
@@ -497,6 +507,18 @@ export default function AssetsPage() {
             </div>
           }
         />
+
+        {canBulk && !assetsQuery.isError && (
+          <SelectMatchingBanner
+            listFilters={listFilters}
+            total={total}
+            pageCount={rows.length}
+            selectedCount={selectedIds.length}
+            allPageSelected={allPageSelected}
+            onSelected={setSelectedIds}
+            onClear={() => setSelectedIds([])}
+          />
+        )}
 
         {/* Desktop / tablet: data table */}
         <div className="hidden md:block">

@@ -1222,6 +1222,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assets/bulk/ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue an async job that exports asset ids matching a GET /assets filter set.
+         * @description Collects asset _ids ONLY (no documents) matching the exact same filter set as GET /assets — including venue scoping, so a manager/staff can only ever export ids of assets they could see in the list. Deliberately routed under /assets/bulk/ (not /assets/ids) to avoid colliding with the /assets/:id param route. Enqueue-time validation is synchronous (400): malformed ObjectId filters use the same per-field errors as GET /assets, and limit must be 1..ASSET_IDS_MAX_LIMIT (optional, defaults to the cap). Returns 202 + a BulkJob; poll GET /assets/bulk/jobs/{jobId} and download the JSON artifact from GET /assets/bulk/jobs/{jobId}/result once completed. The scan is keyset-paginated and read-only; ids are ascending by _id as observed during the scan (not a point-in-time snapshot).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BulkIdsRequest"];
+                };
+            };
+            responses: {
+                /** @description Job accepted. Poll the returned BulkJob; the JSON artifact is served from the /result sub-resource. */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["BulkJob"];
+                        };
+                    };
+                };
+                400: components["responses"]["ErrorResponse"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assets/bulk/transfer": {
         parameters: {
             query?: never;
@@ -1504,8 +1550,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Stream the rendered QR PDF for a completed qr job.
-         * @description RBAC: the requesting principal or an admin. Returns 404 while the job is not yet completed or if the job is not a qr job. After the result retention window (BULK_RESULT_TTL_DAYS) the rendered PDF is deleted and this endpoint returns 410 Gone.
+         * Stream a completed job artifact: the QR PDF (qr jobs) or the asset-ids JSON (ids jobs).
+         * @description RBAC: the requesting principal or an admin. Returns 404 while the job is not yet completed or if the job type has no downloadable artifact. For a qr job the body is application/pdf; for an ids job it is application/json matching AssetIdsResult. After the retention window (BULK_RESULT_TTL_DAYS) the artifact is deleted and this endpoint returns 410 Gone.
          */
         get: {
             parameters: {
@@ -1518,13 +1564,14 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description combined PDF of labels */
+                /** @description The job artifact (PDF for qr jobs, JSON for ids jobs). */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/pdf": string;
+                        "application/json": components["schemas"]["AssetIdsResult"];
                     };
                 };
                 401: components["responses"]["ErrorResponse"];
@@ -3099,6 +3146,38 @@ export interface components {
         BulkQrRequest: {
             assetIds: components["schemas"]["ObjectId"][];
         };
+        /** @description Mirrors the GET /assets query parameters EXACTLY (venue, currentVenue, category, department, status, responsible, away, overdue, q) and is kept in lockstep with that parameter list — the same builder (service.BuildAssetListQuery) parses both. All fields optional; an empty/absent object means "everything visible to the caller" (an unfiltered GET /assets), capped by limit and by the caller's venue scope. Malformed ObjectId values yield the same per-field 400 as GET /assets. */
+        AssetListFilters: {
+            /** @description Home venue id. */
+            venue?: string;
+            currentVenue?: string;
+            category?: string;
+            department?: string;
+            /** @description Not enum-validated at enqueue (mirrors GET /assets); an unknown value matches zero assets. */
+            status?: components["schemas"]["AssetStatus"];
+            responsible?: string;
+            away?: boolean;
+            overdue?: boolean;
+            /** @description free-text on name/serialNumber/assetTag */
+            q?: string;
+        };
+        /** @description Enqueue an async asset-id export. filters mirrors GET /assets; limit caps the result. */
+        BulkIdsRequest: {
+            filters?: components["schemas"]["AssetListFilters"];
+            /** @description Max ids to collect (1..ASSET_IDS_MAX_LIMIT). Optional; defaults to the server cap. */
+            limit?: number;
+        };
+        /** @description The JSON artifact served by GET /assets/bulk/jobs/{jobId}/result for an ids job. assetIds are ascending by _id (insertion order, NOT name or relevance), as observed during the scan (not a point-in-time snapshot). */
+        AssetIdsResult: {
+            jobId: components["schemas"]["ObjectId"];
+            /** Format: date-time */
+            generatedAt: string;
+            /** @description Number of ids in assetIds (== limit when truncated). */
+            count: number;
+            /** @description True when more assets matched than limit. */
+            truncated: boolean;
+            assetIds: components["schemas"]["ObjectId"][];
+        };
         BulkTransferRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             toVenueId: components["schemas"]["ObjectId"];
@@ -3165,8 +3244,11 @@ export interface components {
             updated: number;
             skipped: components["schemas"]["BulkConditionSkipped"][];
         };
-        /** @enum {string} */
-        BulkJobType: "transfer" | "status" | "assign" | "condition" | "qr";
+        /**
+         * @description transfer/status/assign/condition mutate assets in batched transactions; qr renders a combined PDF artifact; ids exports asset _ids matching a GET /assets filter set as a JSON artifact.
+         * @enum {string}
+         */
+        BulkJobType: "transfer" | "status" | "assign" | "condition" | "qr" | "ids";
         /**
          * @description queued (awaiting a worker), running (claimed, batches executing), completed (all batches done, zero row errors), completed_with_errors (done, some rows failed/skipped-as-error), failed (zero successes or a fatal infrastructure error).
          * @enum {string}
