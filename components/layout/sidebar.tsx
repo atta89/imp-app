@@ -43,7 +43,7 @@ export function Sidebar({
     <div className="flex h-full w-70 flex-col bg-sidebar">
       {/* Top: logo + dark-mode toggle (+ close on mobile drawer) */}
       <div className="flex items-center justify-between px-5 pt-5 pb-4">
-        <Logo />
+        <Logo variant="full" />
         <div className="flex items-center gap-1">
           <ThemeToggle />
           {onClose && (

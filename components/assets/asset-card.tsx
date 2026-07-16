@@ -24,7 +24,7 @@ export function AssetCard({
     <Card
       className={cn(
         "p-4",
-        selected && "ring-2 ring-brand-200 dark:ring-brand-400/40",
+        selected && "ring-2 ring-orange-300 dark:ring-orange-400/40",
       )}
     >
       <div className="flex items-start gap-3">

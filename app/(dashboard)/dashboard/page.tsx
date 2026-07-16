@@ -271,7 +271,7 @@ function ByVenue({
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-brand"
+              className="h-full rounded-full bg-orange-500"
               style={{ width: `${Math.round((venue.count / max) * 100)}%` }}
             />
           </div>

@@ -199,7 +199,7 @@ export function DataTable<T>({
                       className={cn(
                         "border-b border-border transition-colors last:border-b-0",
                         isSelected
-                          ? "bg-brand-25 dark:bg-brand-400/10"
+                          ? "bg-orange-25 dark:bg-orange-400/10"
                           : "hover:bg-gray-50 dark:hover:bg-white/4",
                         onRowClick && "cursor-pointer",
                       )}

@@ -24,7 +24,7 @@ export function Progress({
     >
       <div
         className={cn(
-          "h-full rounded-full bg-brand transition-[width] duration-500 ease-out",
+          "h-full rounded-full bg-orange-500 transition-[width] duration-500 ease-out",
           !determinate &&
             "w-2/5 animate-pulse motion-reduce:animate-none motion-reduce:w-full",
         )}

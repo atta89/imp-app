@@ -28,7 +28,7 @@ function jobPct(job: BulkJob | undefined): number | undefined {
 }
 
 const bannerClass =
-  "rounded-xl border border-brand-200 bg-brand-25 px-4 py-2.5 text-sm text-text-secondary dark:border-brand-400/20 dark:bg-brand-400/10";
+  "rounded-xl border border-orange-200 bg-orange-25 px-4 py-2.5 text-sm text-text-secondary dark:border-orange-400/20 dark:bg-orange-400/10";
 
 /**
  * Gmail-style "select everything that matches" affordance. Once the whole

@@ -16,8 +16,8 @@ const TONES: Record<StatTone, { tint: string; icon: string }> = {
     icon: "text-info-600 dark:text-info-400",
   },
   brand: {
-    tint: "bg-brand-50 dark:bg-brand-400/15",
-    icon: "text-brand-600 dark:text-brand-400",
+    tint: "bg-orange-50 dark:bg-orange-400/15",
+    icon: "text-orange-700 dark:text-orange-400",
   },
   warning: {
     tint: "bg-warning-50 dark:bg-warning-400/15",

@@ -81,7 +81,7 @@ function ScanView() {
       )}
 
       <p className="mt-auto text-center text-xs text-text-tertiary">
-        Asset tracking by <span className="font-medium text-text-secondary">imp</span>
+        Asset tracking by <span className="font-medium text-text-secondary">NICE</span>
       </p>
     </main>
   );

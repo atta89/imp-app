@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Inventory Management",
+  title: "NICE — Inventory Management",
   description:
     "Multi-venue inventory management — track assets, locations, custody and repairs.",
 };

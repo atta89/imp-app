@@ -30,7 +30,7 @@ export function HorizontalBarChart({
 
   const axis = dark ? "#98A2B3" : "#667085"; // gray-400 / gray-500
   const grid = dark ? "rgba(255,255,255,0.08)" : "#EAECF0";
-  const bar = dark ? "#B692F6" : "#7F56D9"; // brand-400 / brand-600
+  const bar = dark ? "#E4A264" : "#DB8533"; // orange-400 / orange-600 (decorative accent)
   const surface = dark ? "#1D2939" : "#FFFFFF";
   const border = dark ? "#344054" : "#EAECF0";
   const text = dark ? "#F9FAFB" : "#101828";

@@ -25,9 +25,9 @@ export function Stepper({ current }: { current: ImportStep }) {
               <span
                 className={cn(
                   "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
-                  state === "done" && "bg-brand text-brand-foreground",
+                  state === "done" && "bg-orange-500 text-gray-950",
                   state === "current" &&
-                    "bg-brand-50 text-brand-700 ring-2 ring-brand-300 dark:bg-brand-400/15 dark:text-brand-300 dark:ring-brand-400/40",
+                    "bg-orange-50 text-foreground ring-2 ring-orange-400 dark:bg-orange-400/15 dark:ring-orange-400/40",
                   state === "upcoming" &&
                     "bg-muted text-text-tertiary",
                 )}
@@ -49,7 +49,7 @@ export function Stepper({ current }: { current: ImportStep }) {
               <span
                 className={cn(
                   "mx-2 h-px w-6 sm:w-10",
-                  i < currentIndex ? "bg-brand" : "bg-border",
+                  i < currentIndex ? "bg-orange-500" : "bg-border",
                 )}
               />
             )}

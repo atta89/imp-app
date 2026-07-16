@@ -21,18 +21,35 @@
   --gray-900: #101828;
   --gray-950: #0c111d;
 
-  /* Brand / accent (violet) */
-  --brand-25: #fcfaff;
-  --brand-50: #f9f5ff;
-  --brand-100: #f4ebff;
-  --brand-200: #e9d7fe;
-  --brand-300: #d6bbfb;
-  --brand-400: #b692f6;
-  --brand-500: #9e77ed;
-  --brand-600: #7f56d9;
-  --brand-700: #6941c6;
-  --brand-800: #53389e;
-  --brand-900: #42307d;
+  /* Brand / accent (NICE navy — the interactive accent: links, focus, active).
+     Navy leads because it clears WCAG on the light theme where the NICE orange
+     cannot (orange-600 on white ≈ 2.83:1). Orange is the decorative accent below. */
+  --brand-25: #f9f9fb;
+  --brand-50: #f0f1f6;
+  --brand-100: #dedeeb;
+  --brand-200: #bcbed7;
+  --brand-300: #8e91bc;
+  --brand-400: #6064a0;
+  --brand-500: #41458d;
+  --brand-600: #2e3382;
+  --brand-700: #282d73;
+  --brand-800: #222664;
+  --brand-900: #1d2157;
+
+  /* NICE orange — DECORATIVE accent only (emblem + non-text graphic fills:
+     progress bars, stepper fills, stat-card icon tiles, chart bars). Never used
+     for text/icons on the light theme (fails contrast). */
+  --orange-25: #fefbf9;
+  --orange-50: #fcf6f1;
+  --orange-100: #f9ebde;
+  --orange-200: #f3d8be;
+  --orange-300: #ecbd91;
+  --orange-400: #e4a264;
+  --orange-500: #de9045;
+  --orange-600: #db8533;
+  --orange-700: #c4762d;
+  --orange-800: #ad6826;
+  --orange-900: #995b21;
 
   /* Semantic */
   --success-50: #ecfdf3;
@@ -87,7 +104,7 @@
   --accent: var(--gray-100); /* neutral hover surface */
   --accent-foreground: var(--gray-900);
 
-  /* brand accent — violet, used SPARINGLY (links, focus, logo, highlights) */
+  /* brand accent — NICE navy, used SPARINGLY (links, focus, active, highlights) */
   --brand: var(--brand-600);
   --brand-foreground: #ffffff;
 
@@ -148,8 +165,9 @@
   --accent: rgba(255, 255, 255, 0.06);
   --accent-foreground: var(--gray-50);
 
-  /* Accent uses a LIGHTER tint on dark; filled accent carries dark text. */
-  --brand: var(--brand-400); /* #B692F6 */
+  /* Accent uses a LIGHTER tint on dark so brand TEXT clears 4.5:1 on the near-black
+     canvas: navy-300 #8E91BC ≈ 6.2:1 (navy-400 would only be ~3.4:1). */
+  --brand: var(--brand-300); /* #8E91BC */
   --brand-foreground: var(--gray-950);
 
   --destructive: var(--error-500);
@@ -159,7 +177,7 @@
   /* Interactive edges (inputs/selects/secondary buttons) must read as structure
      ≥3:1 against the near-black canvas, so they're lighter than dividers. */
   --input: var(--gray-500);
-  --ring: var(--brand-400); /* visible focus on dark */
+  --ring: var(--brand-300); /* visible focus on dark */
 
   --text-secondary: var(--gray-300); /* #D0D5DD */
   --text-tertiary: var(--gray-400); /* #98A2B3 */
@@ -169,7 +187,7 @@
   --sidebar-border: var(--gray-800);
   --sidebar-accent: rgba(255, 255, 255, 0.08); /* active nav overlay */
   --sidebar-accent-foreground: var(--gray-50);
-  --sidebar-ring: var(--brand-400);
+  --sidebar-ring: var(--brand-300);
 }
 
 /* ============================================================
@@ -264,6 +282,19 @@
   --color-brand-700: var(--brand-700);
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
+
+  /* NICE orange — decorative accent utilities (bg-orange-500, text-orange-600, …) */
+  --color-orange-25: var(--orange-25);
+  --color-orange-50: var(--orange-50);
+  --color-orange-100: var(--orange-100);
+  --color-orange-200: var(--orange-200);
+  --color-orange-300: var(--orange-300);
+  --color-orange-400: var(--orange-400);
+  --color-orange-500: var(--orange-500);
+  --color-orange-600: var(--orange-600);
+  --color-orange-700: var(--orange-700);
+  --color-orange-800: var(--orange-800);
+  --color-orange-900: var(--orange-900);
 
   --color-success-50: var(--success-50);
   --color-success-300: var(--success-300);

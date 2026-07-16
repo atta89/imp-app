@@ -75,7 +75,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
-        <Logo />
+        <Logo variant="mark" />
         <button
           ref={triggerRef}
           type="button"
