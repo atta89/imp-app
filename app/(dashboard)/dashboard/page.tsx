@@ -23,8 +23,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDashboardSummary } from "@/lib/api/hooks";
-import type { AssetStatus, DashboardSummary } from "@/lib/api/types";
+import { useDashboardSummary, useInventoryByVenue } from "@/lib/api/hooks";
+import type {
+  AssetStatus,
+  DashboardSummary,
+  InventoryByVenueRow,
+} from "@/lib/api/types";
 
 type BadgeColor = React.ComponentProps<typeof Badge>["color"];
 
@@ -94,6 +98,7 @@ export default function DashboardPage() {
     refetch,
     isFetching,
   } = useDashboardSummary();
+  const inventory = useInventoryByVenue();
 
   return (
     <PageContainer>
@@ -160,11 +165,12 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {/* Inventory by venue */}
+              {/* Departments by venue — one card per venue, broken down by home
+                  department, so asset distribution is comparable across venues. */}
               <Section className="lg:col-span-2">
                 <SectionHeader
-                  title="Inventory by venue"
-                  description="Assets registered at each venue."
+                  title="Departments by venue"
+                  description="Per-venue asset counts, broken down by home department."
                   action={
                     <Button variant="link" size="sm" asChild>
                       <Link href="/assets">
@@ -174,11 +180,13 @@ export default function DashboardPage() {
                     </Button>
                   }
                 />
-                <Card>
-                  <CardContent className="p-5 sm:p-6">
-                    <ByVenue summary={summary} loading={isLoading} />
-                  </CardContent>
-                </Card>
+                <VenueDepartmentCards
+                  rows={inventory.data}
+                  loading={inventory.isLoading}
+                  isError={inventory.isError}
+                  onRetry={() => inventory.refetch()}
+                  refetching={inventory.isFetching}
+                />
               </Section>
 
               {/* Assets by status */}
@@ -222,61 +230,162 @@ export default function DashboardPage() {
   );
 }
 
-function ByVenue({
-  summary,
+function VenueDepartmentCards({
+  rows,
   loading,
+  isError,
+  onRetry,
+  refetching,
 }: {
-  summary: DashboardSummary | undefined;
+  rows: InventoryByVenueRow[] | undefined;
   loading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+  refetching: boolean;
 }) {
-  if (loading || !summary) {
+  if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-8" />
+          <Card key={i} className="p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-10 rounded-full" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+              <Skeleton className="h-8 w-10" />
             </div>
-            <Skeleton className="h-2 w-full rounded-full" />
-          </div>
+            <div className="mt-4 space-y-2.5">
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-3.5 w-6" />
+                  </div>
+                  <Skeleton className="h-1.5 w-full rounded-full" />
+                </div>
+              ))}
+            </div>
+          </Card>
         ))}
       </div>
     );
   }
 
-  if (summary.byVenue.length === 0) {
+  if (isError) {
     return (
-      <EmptyState
-        icon={Building2}
-        title="No venues yet"
-        description="Create a venue and add assets to see the breakdown here."
-      />
+      <Card>
+        <CardContent className="p-0">
+          <EmptyState
+            icon={AlertTriangle}
+            tone="error"
+            title="Couldn’t load venues"
+            description="There was a problem reaching the server."
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onRetry}
+                disabled={refetching}
+              >
+                <RotateCw className="size-4" />
+                Retry
+              </Button>
+            }
+          />
+        </CardContent>
+      </Card>
     );
   }
 
-  const max = Math.max(...summary.byVenue.map((v) => v.count), 1);
+  if (!rows || rows.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-0">
+          <EmptyState
+            icon={Building2}
+            title="No venues yet"
+            description="Create a venue and add assets to see the breakdown here."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {summary.byVenue.map((venue) => (
-        <div key={venue.venueId} className="space-y-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="truncate text-sm font-medium text-foreground">
-              {venue.venueName}
-            </span>
-            <span className="shrink-0 text-sm tabular-nums text-text-secondary">
-              {venue.count.toLocaleString()}
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-orange-500"
-              style={{ width: `${Math.round((venue.count / max) * 100)}%` }}
-            />
-          </div>
-        </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {rows.map((row) => (
+        <VenueCard key={row.venueId} row={row} />
       ))}
     </div>
+  );
+}
+
+function VenueCard({ row }: { row: InventoryByVenueRow }) {
+  const departments = [...(row.byDepartment ?? [])].sort(
+    (a, b) => b.count - a.count,
+  );
+
+  return (
+    <Card className="flex flex-col p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-700 dark:bg-orange-400/15 dark:text-orange-400">
+            <Building2 className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-foreground">
+              {row.venueName}
+            </p>
+            <p className="text-xs text-text-tertiary">
+              {departments.length} department
+              {departments.length === 1 ? "" : "s"}
+            </p>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-display-sm leading-none tabular-nums text-foreground">
+            {row.total.toLocaleString()}
+          </p>
+          <p className="mt-0.5 text-xs text-text-tertiary">
+            asset{row.total === 1 ? "" : "s"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2.5">
+        {departments.length === 0 ? (
+          <p className="text-xs text-text-tertiary">No departments</p>
+        ) : (
+          departments.map((d) => {
+            const pct =
+              row.total > 0
+                ? Math.round((d.count / row.total) * 100)
+                : 0;
+            return (
+              <div key={d.departmentId} className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate text-sm text-text-secondary">
+                    {d.departmentName}
+                  </span>
+                  <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">
+                    {d.count.toLocaleString()}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-orange-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Card>
   );
 }
