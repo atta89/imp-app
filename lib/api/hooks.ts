@@ -2,6 +2,7 @@
 
 import {
   useQuery,
+  useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -280,25 +281,68 @@ export function useInventoryByVenue() {
   });
 }
 
+// These three report lists use keyset (cursor) pagination — forward-only, no
+// total. Each page's `meta.cursor.nextCursor` is fed back as `?cursor=` for the
+// next page, and is present only while `hasMore` is true. First page omits it.
+const REPORT_PAGE_SIZE = 10;
+
 export function useAssetsAwayReport() {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.reports.assetsAway,
-    queryFn: async () => unwrap(await api.GET("/reports/assets-away")).data ?? [],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await api.GET("/reports/assets-away", {
+          params: {
+            query: {
+              limit: REPORT_PAGE_SIZE,
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (lastPage) =>
+      lastPage.meta?.cursor?.hasMore ? lastPage.meta.cursor.nextCursor : undefined,
   });
 }
 
 export function useAssetsOverdueReport() {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.reports.assetsOverdue,
-    queryFn: async () =>
-      unwrap(await api.GET("/reports/assets-overdue")).data ?? [],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await api.GET("/reports/assets-overdue", {
+          params: {
+            query: {
+              limit: REPORT_PAGE_SIZE,
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (lastPage) =>
+      lastPage.meta?.cursor?.hasMore ? lastPage.meta.cursor.nextCursor : undefined,
   });
 }
 
 export function useInRepairReport() {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.reports.inRepair,
-    queryFn: async () => unwrap(await api.GET("/reports/in-repair")).data ?? [],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await api.GET("/reports/in-repair", {
+          params: {
+            query: {
+              limit: REPORT_PAGE_SIZE,
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (lastPage) =>
+      lastPage.meta?.cursor?.hasMore ? lastPage.meta.cursor.nextCursor : undefined,
   });
 }
 

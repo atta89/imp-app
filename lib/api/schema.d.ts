@@ -1233,7 +1233,7 @@ export interface paths {
         put?: never;
         /**
          * Enqueue an async job that exports asset ids matching a GET /assets filter set.
-         * @description Collects asset _ids ONLY (no documents) matching the exact same filter set as GET /assets — including venue scoping, so a manager/staff can only ever export ids of assets they could see in the list. Deliberately routed under /assets/bulk/ (not /assets/ids) to avoid colliding with the /assets/:id param route. Enqueue-time validation is synchronous (400): malformed ObjectId filters use the same per-field errors as GET /assets, and limit must be 1..ASSET_IDS_MAX_LIMIT (optional, defaults to the cap). Returns 202 + a BulkJob; poll GET /assets/bulk/jobs/{jobId} and download the JSON artifact from GET /assets/bulk/jobs/{jobId}/result once completed. The scan is keyset-paginated and read-only; ids are ascending by _id as observed during the scan (not a point-in-time snapshot).
+         * @description Collects asset _ids ONLY (no documents) matching the exact same filter set as GET /assets — including venue scoping, so a manager/staff can only ever export ids of assets they could see in the list. Deliberately routed under /assets/bulk/ (not /assets/ids) to avoid colliding with the /assets/:id param route. Enqueue-time validation is synchronous (400): malformed ObjectId filters use the same per-field errors as GET /assets, and limit must be 1..ASSET_IDS_MAX_LIMIT (optional, defaults to the cap). Returns 202 + a BulkJob; poll GET /assets/bulk/jobs/{jobId} and download the JSON artifact from GET /assets/bulk/jobs/{jobId}/result once completed. The scan is keyset-paginated and read-only; ids are descending by createdAt (newest first, following the GET /assets list sort) as observed during the scan (not a point-in-time snapshot).
          */
         post: {
             parameters: {
@@ -2340,7 +2340,11 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    /** @description Opaque keyset cursor from a previous response's meta.cursor.nextCursor. Omit for the first page. */
+                    cursor?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2355,6 +2359,9 @@ export interface paths {
                     content: {
                         "application/json": {
                             data?: components["schemas"]["Asset"][];
+                            meta?: {
+                                cursor?: components["schemas"]["CursorPagination"];
+                            };
                         };
                     };
                 };
@@ -2377,7 +2384,11 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    /** @description Opaque keyset cursor from a previous response's meta.cursor.nextCursor. Omit for the first page. */
+                    cursor?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2392,6 +2403,9 @@ export interface paths {
                     content: {
                         "application/json": {
                             data?: components["schemas"]["Asset"][];
+                            meta?: {
+                                cursor?: components["schemas"]["CursorPagination"];
+                            };
                         };
                     };
                 };
@@ -2414,7 +2428,11 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    /** @description Opaque keyset cursor from a previous response's meta.cursor.nextCursor. Omit for the first page. */
+                    cursor?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2429,6 +2447,9 @@ export interface paths {
                     content: {
                         "application/json": {
                             data?: components["schemas"]["Repair"][];
+                            meta?: {
+                                cursor?: components["schemas"]["CursorPagination"];
+                            };
                         };
                     };
                 };
@@ -2680,8 +2701,15 @@ export interface components {
             total: number;
             totalPages: number;
         };
+        CursorPagination: {
+            limit: number;
+            hasMore: boolean;
+            /** @description Opaque token; pass back as the `cursor` query param to fetch the next page. Present only when hasMore is true. */
+            nextCursor?: string;
+        };
         Meta: {
             pagination?: components["schemas"]["Pagination"];
+            cursor?: components["schemas"]["CursorPagination"];
         };
         ErrorPayload: {
             /** @enum {string} */
@@ -3167,7 +3195,7 @@ export interface components {
             /** @description Max ids to collect (1..ASSET_IDS_MAX_LIMIT). Optional; defaults to the server cap. */
             limit?: number;
         };
-        /** @description The JSON artifact served by GET /assets/bulk/jobs/{jobId}/result for an ids job. assetIds are ascending by _id (insertion order, NOT name or relevance), as observed during the scan (not a point-in-time snapshot). */
+        /** @description The JSON artifact served by GET /assets/bulk/jobs/{jobId}/result for an ids job. assetIds are descending by createdAt (newest first — the most recently created matching assets, with _id as a stable tiebreak, NOT name or relevance), following the GET /assets list sort; when more assets match than limit, the newest `limit` are kept. Ids are as observed during the scan (not a point-in-time snapshot). */
         AssetIdsResult: {
             jobId: components["schemas"]["ObjectId"];
             /** Format: date-time */

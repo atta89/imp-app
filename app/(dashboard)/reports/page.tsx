@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { PlaneTakeoff, AlertTriangle, Wrench, Building2 } from "lucide-react";
+import {
+  PlaneTakeoff,
+  AlertTriangle,
+  Wrench,
+  Building2,
+  Loader2,
+} from "lucide-react";
 
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,11 +23,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/assets/status-badge";
 import { ResponsibleCell } from "@/components/assets/responsible-cell";
 import { HorizontalBarChart } from "@/components/reports/bar-chart";
 import {
+  useDashboardSummary,
   useInventoryByVenue,
   useByResponsibleReport,
   useAssetsAwayReport,
@@ -63,11 +71,55 @@ function ChartCard({
   );
 }
 
+/**
+ * Forward-only pager for the keyset-paginated report tables. Keyset pagination
+ * has no total, so the total is sourced separately (from the dashboard summary)
+ * and shown as "Showing N of {total}". The "Load more" button appears only while
+ * there's a next page to fetch.
+ */
+function LoadMoreFooter({
+  count,
+  total,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+}: {
+  count: number;
+  total?: number;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 pt-3">
+      <span className="text-xs text-text-tertiary tabular-nums">
+        Showing {count}
+        {total !== undefined ? ` of ${total}` : ""}
+      </span>
+      {hasNextPage && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onLoadMore}
+          disabled={isFetchingNextPage}
+        >
+          {isFetchingNextPage && (
+            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+          )}
+          {isFetchingNextPage ? "Loading…" : "Load more"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
+  const summary = useDashboardSummary();
   const inventory = useInventoryByVenue();
   const byResponsible = useByResponsibleReport();
   const away = useAssetsAwayReport();
@@ -85,6 +137,20 @@ export default function ReportsPage() {
     enabled: canFireByDept,
   });
 
+  // Keyset-paginated reports arrive as pages; flatten each into a single list.
+  const awayItems = React.useMemo(
+    () => away.data?.pages.flatMap((p) => p.data ?? []) ?? [],
+    [away.data],
+  );
+  const overdueItems = React.useMemo(
+    () => overdue.data?.pages.flatMap((p) => p.data ?? []) ?? [],
+    [overdue.data],
+  );
+  const inRepairItems = React.useMemo(
+    () => inRepair.data?.pages.flatMap((p) => p.data ?? []) ?? [],
+    [inRepair.data],
+  );
+
   const lookups = React.useMemo(
     () => buildLookups(venuesQuery.data, categoriesQuery.data, usersQuery.data),
     [venuesQuery.data, categoriesQuery.data, usersQuery.data],
@@ -92,10 +158,10 @@ export default function ReportsPage() {
 
   const assetMap = React.useMemo(() => {
     const m = new Map<string, string>();
-    for (const a of away.data ?? []) m.set(a.id, a.name);
-    for (const a of overdue.data ?? []) m.set(a.id, a.name);
+    for (const a of awayItems) m.set(a.id, a.name);
+    for (const a of overdueItems) m.set(a.id, a.name);
     return m;
-  }, [away.data, overdue.data]);
+  }, [awayItems, overdueItems]);
 
   const assetColumns: Column<AssetRow>[] = [
     {
@@ -345,7 +411,7 @@ export default function ReportsPage() {
           />
           <DataTable
             columns={assetColumns}
-            data={toRows(away.data)}
+            data={toRows(awayItems)}
             getRowId={(a) => a.id}
             loading={away.isLoading}
             skeletonRows={4}
@@ -358,6 +424,13 @@ export default function ReportsPage() {
               />
             }
           />
+          <LoadMoreFooter
+            count={awayItems.length}
+            total={summary.data?.awayFromHome}
+            hasNextPage={away.hasNextPage}
+            isFetchingNextPage={away.isFetchingNextPage}
+            onLoadMore={() => away.fetchNextPage()}
+          />
         </Section>
 
         <Section>
@@ -367,7 +440,7 @@ export default function ReportsPage() {
           />
           <DataTable
             columns={assetColumns}
-            data={toRows(overdue.data)}
+            data={toRows(overdueItems)}
             getRowId={(a) => a.id}
             loading={overdue.isLoading}
             skeletonRows={4}
@@ -380,6 +453,13 @@ export default function ReportsPage() {
               />
             }
           />
+          <LoadMoreFooter
+            count={overdueItems.length}
+            total={summary.data?.overdue}
+            hasNextPage={overdue.hasNextPage}
+            isFetchingNextPage={overdue.isFetchingNextPage}
+            onLoadMore={() => overdue.fetchNextPage()}
+          />
         </Section>
 
         <Section>
@@ -389,7 +469,7 @@ export default function ReportsPage() {
           />
           <DataTable
             columns={repairColumns}
-            data={inRepair.data ?? []}
+            data={inRepairItems}
             getRowId={(r) => r.id}
             loading={inRepair.isLoading}
             skeletonRows={4}
@@ -401,6 +481,13 @@ export default function ReportsPage() {
                 description="No open repair tickets right now."
               />
             }
+          />
+          <LoadMoreFooter
+            count={inRepairItems.length}
+            total={summary.data?.inRepair}
+            hasNextPage={inRepair.hasNextPage}
+            isFetchingNextPage={inRepair.isFetchingNextPage}
+            onLoadMore={() => inRepair.fetchNextPage()}
           />
         </Section>
       </div>
