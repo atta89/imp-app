@@ -35,5 +35,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|apple-icon.png).*)"],
+  // Skip the auth gate for API routes, Next internals, and any static image
+  // asset (favicon.ico, icon.png, apple-icon.png, brand images, …) so icons
+  // are served to unauthenticated visitors instead of redirecting to /login.
+  matcher: [
+    "/((?!api|_next/static|_next/image|.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
