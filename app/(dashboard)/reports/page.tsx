@@ -54,7 +54,7 @@ function ChartCard({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <Skeleton className="h-[260px] w-full" />
+          <Skeleton className="h-65 w-full" />
         ) : (
           <HorizontalBarChart data={data} />
         )}
@@ -325,7 +325,7 @@ export default function ReportsPage() {
                   description="Choose a venue above to see its department breakdown."
                 />
               ) : byDept.isLoading ? (
-                <Skeleton className="h-[260px] w-full" />
+                <Skeleton className="h-65 w-full" />
               ) : (
                 <HorizontalBarChart
                   data={(byDept.data ?? []).map((r) => ({
