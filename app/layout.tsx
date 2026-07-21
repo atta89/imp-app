@@ -13,9 +13,6 @@ export const metadata: Metadata = {
   title: "NICE — Inventory Management",
   description:
     "Multi-venue inventory management — track assets, locations, custody and repairs.",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
