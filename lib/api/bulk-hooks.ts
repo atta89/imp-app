@@ -8,9 +8,7 @@ import { toApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
   AssetIdsResult,
-  BulkActionResponse,
   BulkAssignRequest,
-  BulkAssignResponse,
   BulkConditionUpdate,
   BulkIdsRequest,
   BulkJob,
@@ -30,41 +28,6 @@ export function isBulkJobTerminal(status: BulkJobStatus | undefined): boolean {
 }
 
 /**
- * Outcome of enqueuing a mutating bulk action. The four mutating endpoints
- * branch on HTTP status: 202 → a job was enqueued (poll it); 200 → strict
- * per-row validation failed, NOTHING was enqueued and per-row diagnostics come
- * back inline (today's shape). See openapi `POST /assets/bulk/*` + PRD v0.9.
- */
-export type BulkEnqueueOutcome<Diag> =
-  | { kind: "job"; job: BulkJob }
-  | { kind: "diagnostics"; diagnostics: Diag };
-
-type Envelope = { data: unknown };
-
-/**
- * Shared enqueue caller. The generated schema only types the 202 response, so
- * we read the raw status off `response` and cast the envelope accordingly.
- * `hasDiag` is false for endpoints that can only 202 (condition/qr).
- */
-async function enqueue<Diag>(
-  result: {
-    data?: { data: BulkJob } | undefined;
-    error?: unknown;
-    response: Response;
-  },
-): Promise<BulkEnqueueOutcome<Diag>> {
-  const { response } = result;
-  if (result.error !== undefined || !response.ok || result.data === undefined) {
-    throw toApiError(result.error, response.status);
-  }
-  const envelope = result.data as Envelope;
-  if (response.status === 200) {
-    return { kind: "diagnostics", diagnostics: envelope.data as Diag };
-  }
-  return { kind: "job", job: envelope.data as BulkJob };
-}
-
-/**
  * Invalidate everything a completed bulk job may have changed. Call once when a
  * job reaches a terminal status (rows are applied progressively server-side, so
  * enqueue-time invalidation would be premature).
@@ -77,66 +40,60 @@ export function useInvalidateAfterBulkJob() {
   }, [qc]);
 }
 
-/** Enqueue a bulk transfer. 202 → job; 200 → strict per-row diagnostics. */
+/**
+ * Enqueue a bulk transfer. Always 202 → a job; poll it for progress. Per-asset
+ * problems (not found, out of venue scope, same-venue no-op) become skips on the
+ * job, never inline failures; only request-level errors throw synchronously.
+ */
 export function useBulkTransfer() {
   return useMutation({
-    mutationFn: async (body: BulkTransferRequest) =>
-      enqueue<BulkActionResponse>(
-        await api.POST("/assets/bulk/transfer", { body }),
-      ),
+    mutationFn: async (body: BulkTransferRequest): Promise<BulkJob> =>
+      unwrapJob(await api.POST("/assets/bulk/transfer", { body })),
   });
 }
 
-/** Enqueue a bulk status change. 202 → job; 200 → strict per-row diagnostics. */
+/**
+ * Enqueue a bulk status change. Always 202 → a job; poll it. No-op/forbidden
+ * rows are counted as skips on the job; only request-level errors throw.
+ */
 export function useBulkChangeStatus() {
   return useMutation({
-    mutationFn: async (body: BulkStatusRequest) =>
-      enqueue<BulkActionResponse>(
-        await api.POST("/assets/bulk/status", { body }),
-      ),
+    mutationFn: async (body: BulkStatusRequest): Promise<BulkJob> =>
+      unwrapJob(await api.POST("/assets/bulk/status", { body })),
   });
 }
 
-/** Enqueue a bulk custody reassignment. 202 → job; 200 → strict diagnostics. */
+/**
+ * Enqueue a bulk custody reassignment. Always 202 → a job; poll it. Already-
+ * assigned/forbidden rows are counted as skips on the job; only request-level
+ * errors (unknown/inactive user, empty/over-cap batch) throw synchronously.
+ */
 export function useBulkAssign() {
   return useMutation({
-    mutationFn: async (body: BulkAssignRequest) =>
-      enqueue<BulkAssignResponse>(
-        await api.POST("/assets/bulk/assign", { body }),
-      ),
+    mutationFn: async (body: BulkAssignRequest): Promise<BulkJob> =>
+      unwrapJob(await api.POST("/assets/bulk/assign", { body })),
   });
 }
 
-/** Enqueue a bulk condition change. Best-effort: always 202 (never diagnostics). */
+/** Enqueue a bulk condition change. Always 202; unchanged rows are skipped. */
 export function useBulkUpdateCondition() {
   return useMutation({
-    mutationFn: async (body: BulkConditionUpdate): Promise<BulkJob> => {
-      const out = await enqueue<never>(
-        await api.POST("/assets/condition/bulk", { body }),
-      );
-      // condition can only 202; narrow for callers.
-      if (out.kind !== "job") throw toApiError(undefined, 500);
-      return out.job;
-    },
+    mutationFn: async (body: BulkConditionUpdate): Promise<BulkJob> =>
+      unwrapJob(await api.POST("/assets/condition/bulk", { body })),
   });
 }
 
 /** Enqueue a bulk QR-label render job. Always 202; PDF fetched via /result. */
 export function useBulkQrJob() {
   return useMutation({
-    mutationFn: async (body: BulkQrRequest): Promise<BulkJob> => {
-      const out = await enqueue<never>(
-        await api.POST("/assets/qr/bulk", { body }),
-      );
-      if (out.kind !== "job") throw toApiError(undefined, 500);
-      return out.job;
-    },
+    mutationFn: async (body: BulkQrRequest): Promise<BulkJob> =>
+      unwrapJob(await api.POST("/assets/qr/bulk", { body })),
   });
 }
 
 /**
- * Enqueue an async asset-id export job. Unlike the mutating bulk endpoints this
- * only ever 202s (no 200 diagnostics branch), so we unwrap the job directly.
+ * Enqueue an async asset-id export job. Like every bulk endpoint it 202s with a
+ * job, so we unwrap it directly.
  */
 export function useBulkIdsJob() {
   return useMutation({

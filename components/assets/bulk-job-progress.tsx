@@ -71,7 +71,9 @@ function progressPct(job: BulkJob | undefined): number | undefined {
   return undefined;
 }
 
-// Reuses the same per-row reason wording as the inline diagnostics report.
+// Human labels for the stable per-row error codes a job can surface in errors[].
+// These are genuine execution failures — not-found/forbidden/no-op rows are
+// counted as skips, not listed here.
 const ROW_ERROR_LABEL: Record<string, string> = {
   not_found: "Asset not found",
   forbidden: "Not permitted for your role/venues",
@@ -299,9 +301,9 @@ export function BulkJobProgress({
       : "Job failed";
   const { succeeded, failed, skipped } = job!.counts;
   const subline = success
-    ? `${succeeded} processed${skipped > 0 ? `, ${skipped} skipped` : ""}.`
+    ? `${succeeded} applied${skipped > 0 ? ` · ${skipped} skipped` : ""}.`
     : withErrors
-      ? `${succeeded} succeeded · ${failed} failed${skipped > 0 ? ` · ${skipped} skipped` : ""}.`
+      ? `${succeeded} applied · ${failed} failed${skipped > 0 ? ` · ${skipped} skipped` : ""}.`
       : "No rows were applied.";
 
   return (
@@ -319,6 +321,13 @@ export function BulkJobProgress({
       </div>
 
       <CountGrid counts={job!.counts} />
+
+      {!isQr && skipped > 0 && (
+        <p className="text-xs text-text-tertiary">
+          Skipped assets were left unchanged — deleted, outside your venue scope,
+          or already in the target state. These aren’t errors.
+        </p>
+      )}
 
       {isQr && success && (
         <QrResultDownload jobId={jobId} onRerun={onRerunQr} />

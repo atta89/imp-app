@@ -1279,7 +1279,7 @@ export interface paths {
         put?: never;
         /**
          * Enqueue an async transfer of many assets.
-         * @description Validates the whole batch synchronously (existence + active, per-asset RBAC, target venue exists/active, attachments) and, on any row failure (unless validOnly=true), returns the pre-async 400 contract with no DB change. On success returns 202 + a BulkJob and executes asynchronously in per-batch transactions. Whole-job atomicity is relaxed to PER-BATCH atomicity: rows invalidated between enqueue and execution become row errors, not a whole-job abort. Every Movement is stamped performedBy = the enqueuing principal and performedAt = batch execution time. On completion, one transfer digest is enqueued per home-venue manager covering the assets that actually moved.
+         * @description Returns 202 + BulkJob. Per-asset problems (not_found, forbidden, unchanged) are counted skips; only request-level failures (empty/over-cap batch, unknown target venue/user, malformed enum) return 400. Validates the whole batch synchronously (existence + active, per-asset RBAC, target venue exists/active, attachments) before enqueueing, then executes asynchronously in per-batch transactions. Whole-job atomicity is relaxed to PER-BATCH atomicity: rows invalidated between enqueue and execution become row errors, not a whole-job abort. Every Movement is stamped performedBy = the enqueuing principal and performedAt = batch execution time. On completion, one transfer digest is enqueued per home-venue manager covering the assets that actually moved.
          */
         post: {
             parameters: {
@@ -1325,7 +1325,7 @@ export interface paths {
         put?: never;
         /**
          * Enqueue an async status change on many assets.
-         * @description Validates existence, per-asset RBAC, §5 transition validity per row and attachments synchronously; on any row failure (unless validOnly=true) returns the pre-async 400 contract with no DB change. On success returns 202 + a BulkJob. The state machine is re-validated inside each batch transaction against the asset's then-current status, so a transition invalidated after enqueue becomes a row error (job ends completed_with_errors). No notifications. Per-batch atomicity applies.
+         * @description Returns 202 + BulkJob. Per-asset problems (not_found, forbidden, unchanged) are counted skips; only request-level failures (empty/over-cap batch, unknown target venue/user, malformed enum) return 400. Validates existence, per-asset RBAC, §5 transition validity per row and attachments synchronously before enqueueing. The state machine is re-validated inside each batch transaction against the asset's then-current status, so a transition invalidated after enqueue becomes a row error (job ends completed_with_errors). No notifications. Per-batch atomicity applies.
          */
         post: {
             parameters: {
@@ -1371,7 +1371,7 @@ export interface paths {
         put?: never;
         /**
          * Enqueue an async custody reassignment on many assets.
-         * @description Validates existence, per-asset RBAC and attachments synchronously; an unknown or inactive responsibleUserId is always a whole-request 400 (regardless of validOnly). Assets already assigned to the target user are pre-counted as skipped. On success returns 202 + a BulkJob. Inside each batch transaction the custodian is re-read: still-assigned rows are skipped with NO Movement written. On completion, exactly one custody digest is enqueued to the new custodian listing all newly assigned assets — even across many batches. Per-batch atomicity applies.
+         * @description Returns 202 + BulkJob. Per-asset problems (not_found, forbidden, unchanged) are counted skips; only request-level failures (empty/over-cap batch, unknown target venue/user, malformed enum) return 400. Validates existence, per-asset RBAC and attachments synchronously before enqueueing; an unknown or inactive responsibleUserId is always a whole-request 400. Assets already assigned to the target user are pre-counted as skipped. Inside each batch transaction the custodian is re-read: still-assigned rows are skipped with NO Movement written. On completion, exactly one custody digest is enqueued to the new custodian listing all newly assigned assets — even across many batches. Per-batch atomicity applies.
          */
         post: {
             parameters: {
@@ -3215,62 +3215,25 @@ export interface components {
              */
             expectedReturnDate?: string;
             notes?: string;
-            /** @description If true, enqueue the valid rows and record invalid ones as job row errors instead of failing the whole request. Default false (strict: any invalid row → 400, nothing enqueued). */
-            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkStatusRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             status: components["schemas"]["AssetStatus"];
             reason?: string;
-            /** @description If true, enqueue the valid rows and record invalid ones as job row errors instead of failing the whole request. Default false (strict: any invalid row → 400, nothing enqueued). */
-            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
         };
         BulkAssignRequest: {
             assetIds: components["schemas"]["ObjectId"][];
             responsibleUserId: components["schemas"]["ObjectId"];
             notes?: string;
-            /** @description If true, enqueue the valid rows and record invalid ones as job row errors instead of failing the whole request. Default false (strict: any invalid row → 400, nothing enqueued). Note: an unknown/inactive responsibleUserId is always a whole-request 400 regardless of this flag. */
-            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
-        };
-        BulkActionResult: {
-            assetId: components["schemas"]["ObjectId"];
-            ok: boolean;
-            /** @description Present iff ok=false. Per-row reason: not_found, forbidden, invalid_transition, dest_venue_forbidden, etc. */
-            error?: string;
-        };
-        BulkActionResponse: {
-            total: number;
-            succeeded: number;
-            failed: number;
-            results: components["schemas"]["BulkActionResult"][];
-        };
-        BulkAssignResponse: {
-            total: number;
-            /** @description Assets whose responsibleUserId changed; one custody_change Movement was written for each. */
-            updated: number;
-            /** @description Assets already assigned to responsibleUserId; no movement written. */
-            skippedNoOp: number;
-            results: components["schemas"]["BulkActionResult"][];
         };
         BulkConditionUpdate: {
             assetIds: components["schemas"]["ObjectId"][];
             condition: components["schemas"]["AssetCondition"];
             notes?: string;
-            /** @description Accepted for symmetry with the other bulk actions. The condition job is best-effort by design: no-op/not-found/forbidden rows are counted as skips, not errors, so this flag has no effect on enqueue outcome. */
-            validOnly?: boolean;
             attachmentIds?: components["schemas"]["ObjectId"][];
-        };
-        BulkConditionSkipped: {
-            id: components["schemas"]["ObjectId"];
-            /** @description One of: not_found, forbidden, unchanged. */
-            reason: string;
-        };
-        BulkConditionResult: {
-            updated: number;
-            skipped: components["schemas"]["BulkConditionSkipped"][];
         };
         /**
          * @description transfer/status/assign/condition mutate assets in batched transactions; qr renders a combined PDF artifact; ids exports asset _ids matching a GET /assets filter set as a JSON artifact.
